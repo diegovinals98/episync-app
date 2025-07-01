@@ -8,6 +8,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -16,6 +17,7 @@ import { useToast } from '../contexts/ToastContext';
 import { createComponentStyles } from '../styles/components';
 import { colors } from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
+import Loader from '../components/Loader';
 
 const RegisterScreen = ({ onBack }) => {
   const { isDarkMode } = useTheme();
@@ -251,7 +253,7 @@ const RegisterScreen = ({ onBack }) => {
           >
             {isRegistering ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="refresh" size={20} color="white" style={{ marginRight: 8 }} />
+                <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
                 <Text style={styles.buttonText}>{t('registering')}</Text>
               </View>
             ) : (

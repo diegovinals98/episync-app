@@ -34,21 +34,31 @@ export const ENDPOINTS = {
   users: {
     profile: '/users/profile',
     updateProfile: '/users/profile',
+    search: '/api/v1/users/search',
   },
   groups: {
     list: '/groups',
-    create: '/groups',
+    create: '/api/v1/groups',
     join: '/groups/join',
-    details: (groupId) => `/groups/${groupId}`,
+    details: '/api/v1/groups',
+    series: '/api/v1/groups',
+    members: '/api/v1/groups',
+    user: '/api/v1/groups/user',
   },
   series: {
     popular: '/series/popular',
     search: '/series/search',
     details: (seriesId) => `/series/${seriesId}`,
   },
+  tmdb: {
+    search: '/api/v1/tmdb/search/tv',
+  },
   episodes: {
     markWatched: (episodeId) => `/episodes/${episodeId}/watched`,
     markUnwatched: (episodeId) => `/episodes/${episodeId}/unwatched`,
+  },
+  upload: {
+    image: '/api/v1/upload/image',
   },
 };
 

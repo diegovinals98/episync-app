@@ -60,6 +60,12 @@ export const createComponentStyles = (isDarkMode) => ({
     shadowRadius: 12,
     elevation: 4,
   },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: isDarkMode ? colors.dark.text : colors.light.text,
+    marginBottom: 8,
+  },
   cardCompact: {
     backgroundColor: isDarkMode ? colors.dark.surface : colors.light.surface,
     borderRadius: 16,
@@ -222,6 +228,20 @@ export const createComponentStyles = (isDarkMode) => ({
     fontWeight: '500',
   },
 
+  // Encabezados de sección
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingHorizontal: 0,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: isDarkMode ? colors.dark.text : colors.light.text,
+  },
+
   // Lista de elementos
   listItem: {
     flexDirection: 'row',
@@ -309,5 +329,14 @@ export const createComponentStyles = (isDarkMode) => ({
   },
   statusAway: {
     backgroundColor: colors.warning[500],
+  },
+
+  // Scroll
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
   },
 }); 

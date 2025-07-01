@@ -64,22 +64,70 @@ export const AuthProvider = ({ children }) => {
     try {
       const storedAccessToken = await AsyncStorage.getItem('accessToken');
       const storedRefreshToken = await AsyncStorage.getItem('refreshToken');
-      const storedUser = await AsyncStorage.getItem('user');
+      const storedUserString = await AsyncStorage.getItem('user');
 
-      if (storedAccessToken && storedRefreshToken && storedUser) {
-        setAccessToken(storedAccessToken);
-        setRefreshToken(storedRefreshToken);
-        setUser(JSON.parse(storedUser));
-        setIsAuthenticated(true);
-        
-        // Verificar si el token sigue siendo válido
+      console.log('Cargando tokens almacenados...');
+      
+      // Verificar que tenemos todos los datos necesarios
+      if (!storedAccessToken || !storedRefreshToken || !storedUserString) {
+        console.log('No hay tokens almacenados o están incompletos');
+        console.log('storedAccessToken', storedAccessToken);
+        console.log('storedRefreshToken', storedRefreshToken);
+        console.log('storedUserString', storedUserString);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Intentar parsear los datos del usuario
+      let storedUser;
+      try {
+        storedUser = JSON.parse(storedUserString);
+        if (!storedUser || typeof storedUser !== 'object') {
+          throw new Error('Formato de usuario inválido');
+        }
+      } catch (parseError) {
+        console.error('Error al parsear datos del usuario:', parseError);
+        await clearTokens(); // Limpiar datos corruptos
+        setIsLoading(false);
+        return;
+      }
+
+      // Establecer los datos en el estado
+      setAccessToken(storedAccessToken);
+      setRefreshToken(storedRefreshToken);
+      setUser(storedUser);
+      setIsAuthenticated(true);
+
+      console.log('Tokens cargados correctamente');
+      console.log('storedAccessToken', storedAccessToken);
+      console.log('storedRefreshToken', storedRefreshToken);
+      console.log('storedUserString', storedUserString);
+      
+      // Verificar si el token sigue siendo válido
+      try {
         const isValid = await validateToken(storedAccessToken);
         if (!isValid) {
-          await refreshAccessToken(storedRefreshToken);
+          console.log('Token expirado, intentando refrescar...');
+          const refreshed = await refreshAccessToken(storedRefreshToken);
+          if (!refreshed) {
+            console.log('No se pudo refrescar el token, cerrando sesión');
+            await clearTokens();
+            setIsAuthenticated(false);
+            setUser(null);
+            setAccessToken(null);
+            setRefreshToken(null);
+          }
         }
+      } catch (validationError) {
+        console.error('Error al validar token:', validationError);
       }
     } catch (error) {
       console.error('Error loading tokens:', error);
+      await clearTokens();
+      setIsAuthenticated(false);
+      setUser(null);
+      setAccessToken(null);
+      setRefreshToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -370,30 +418,55 @@ export const AuthProvider = ({ children }) => {
       const response = await apiService.post(ENDPOINTS.auth.refresh, { refreshToken: refresh });
       
       if (!response.success) {
-        throw new Error('Token refresh failed');
+        console.error('Error en refresh token:', response.message);
+        throw new Error(response.message || 'Token refresh failed');
       }
 
       console.log('refresh response', response);
       
       // La respuesta tiene una estructura doblemente anidada: response.data.data
-      const responseData = response.data.data || response.data;
-      const { accessToken, refreshToken: newRefresh, user: userData } = responseData;
+      let responseData;
       
-      if (!accessToken || !newRefresh || !userData) {
-        console.error('Datos inválidos en respuesta de refresh:', responseData);
+      // Intentar obtener los datos de diferentes formas posibles según la estructura de la respuesta
+      if (response.data && response.data.data) {
+        responseData = response.data.data;
+      } else if (response.data) {
+        responseData = response.data;
+      } else {
         throw new Error('Formato de respuesta inválido en refresh token');
       }
       
-      setAccessToken(accessToken);
-      setRefreshToken(newRefresh);
-      setUser(userData);
+      const { accessToken, refreshToken: newRefresh, user: userData } = responseData;
       
-      await saveTokens(accessToken, newRefresh, userData);
+      if (!accessToken) {
+        console.error('Token de acceso no encontrado en la respuesta:', responseData);
+        throw new Error('Token de acceso no encontrado en la respuesta');
+      }
+      
+      // Actualizar el token de acceso
+      setAccessToken(accessToken);
+      
+      // Actualizar el token de refresco si está disponible
+      if (newRefresh) {
+        setRefreshToken(newRefresh);
+      }
+      
+      // Actualizar datos del usuario si están disponibles
+      if (userData) {
+        setUser(userData);
+      }
+      
+      // Guardar los nuevos tokens
+      await saveTokens(
+        accessToken, 
+        newRefresh || refresh, // Usar el nuevo token de refresco o mantener el actual
+        userData || user // Usar los nuevos datos de usuario o mantener los actuales
+      );
       
       return true;
     } catch (error) {
       console.error('Token refresh error:', error);
-      await logout();
+      // No cerrar sesión automáticamente, solo devolver false
       return false;
     }
   };
@@ -448,33 +521,70 @@ export const AuthProvider = ({ children }) => {
           response = await apiService.get(endpoint, headers);
       }
       
-      if (response.status === 401) {
-        // Token expirado, intentar refrescar
+      // Si la respuesta es 401 (Unauthorized) o contiene un mensaje específico de token expirado
+      if (response.status === 401 || 
+          (response.error && typeof response.error === 'string' && 
+           response.error.toLowerCase().includes('token'))) {
+        
+        console.log('Token expirado, intentando refrescar...');
+        
+        // Verificar que tenemos un token de refresco
+        if (!refreshToken) {
+          console.error('No hay refresh token disponible');
+          await logout();
+          return { 
+            success: false, 
+            error: 'Sesión expirada. Por favor inicia sesión nuevamente.' 
+          };
+        }
+        
+        // Intentar refrescar token
         const refreshed = await refreshAccessToken(refreshToken);
+        
         if (refreshed) {
+          console.log('Token refrescado exitosamente, reintentando petición');
+          
           // Reintentar request con nuevo token
           const newHeaders = {
-            ...getAuthHeaders(),
+            ...getAuthHeaders(), // Usar el nuevo token
             ...options.headers,
           };
           
+          // Reintentar la petición con el nuevo token
+          let newResponse;
           switch (options.method?.toUpperCase() || 'GET') {
             case 'POST':
-              return apiService.post(endpoint, options.body, newHeaders);
+              newResponse = await apiService.post(endpoint, options.body, newHeaders);
+              break;
             case 'PUT':
-              return apiService.put(endpoint, options.body, newHeaders);
+              newResponse = await apiService.put(endpoint, options.body, newHeaders);
+              break;
             case 'DELETE':
-              return apiService.delete(endpoint, newHeaders);
+              newResponse = await apiService.delete(endpoint, newHeaders);
+              break;
             default:
-              return apiService.get(endpoint, newHeaders);
+              newResponse = await apiService.get(endpoint, newHeaders);
           }
+          
+          return newResponse;
+        } else {
+          // Si no se pudo refrescar el token, cerrar sesión
+          console.error('No se pudo refrescar el token, cerrando sesión');
+          await logout();
+          return { 
+            success: false, 
+            error: 'Sesión expirada. Por favor inicia sesión nuevamente.' 
+          };
         }
       }
 
       return response;
     } catch (error) {
       console.error('Authenticated request error:', error);
-      throw error;
+      return {
+        success: false,
+        error: error.message || 'Error en la petición autenticada',
+      };
     }
   };
 

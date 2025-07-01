@@ -7,6 +7,7 @@ import {
   StatusBar,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -17,6 +18,7 @@ import { colors } from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../components/Skeleton';
 import RegisterScreen from './RegisterScreen';
+import Loader from '../components/Loader';
 
 const LoginScreen = () => {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -193,7 +195,7 @@ const LoginScreen = () => {
           >
             {isLoggingIn ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="refresh" size={20} color="white" style={{ marginRight: 8 }} />
+                <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
                 <Text style={styles.buttonText}>Iniciando...</Text>
               </View>
             ) : (
