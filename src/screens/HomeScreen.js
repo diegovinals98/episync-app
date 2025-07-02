@@ -86,7 +86,7 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { user, getAuthHeaders, authenticatedRequest } = useAuth();
-  const { success: showSuccess, info: showInfo, error: showError } = useToast();
+  const { success, error, info } = useToast();
   const styles = createComponentStyles(isDarkMode);
   
   const [isLoading, setIsLoading] = useState(false);
@@ -116,10 +116,8 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
       
       if (response.success && response.normalizedData && response.normalizedData.groups) {
         const groupsData = response.normalizedData.groups;
-        console.log('groupsData:', JSON.stringify(groupsData, null, 2));
         
         if (Array.isArray(groupsData)) {
-          console.log('groupsData es un array con', groupsData.length, 'elementos');
           
           // Validar cada grupo antes de procesarlo
           const validGroups = groupsData.filter(group => {
@@ -136,7 +134,6 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
           // Extraer actividad reciente de todos los grupos
           const allActivity = [];
           validGroups.forEach((group, index) => {
-            console.log(`Procesando grupo ${index}:`, group);
             if (group && typeof group === 'object' && group.recent_activity && Array.isArray(group.recent_activity)) {
               // Validar cada actividad antes de procesarla
               const validActivities = group.recent_activity.filter(activity => {
@@ -157,8 +154,7 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
               };
               
               safeGroup.recent_activity.forEach((activity, activityIndex) => {
-                console.log(`Procesando actividad ${activityIndex}:`, activity);
-                if (activity && typeof activity === 'object') {
+                if (activity && typeof activity === 'object' && !Array.isArray(activity)) {
                   try {
                     allActivity.push({
                       ...activity,
@@ -175,12 +171,19 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
                       created_at: new Date().toISOString()
                     });
                   }
+                } else {
+                  // Si no es un objeto válido, añade una actividad básica
+                  allActivity.push({
+                    type: 'unknown',
+                    groupId: safeGroup.id,
+                    groupName: safeGroup.name,
+                    created_at: new Date().toISOString()
+                  });
                 }
               });
             }
           });
           
-          console.log('Actividades extraídas:', allActivity.length);
           
           // Ordenar actividad por fecha más reciente
           allActivity.sort((a, b) => {
@@ -191,28 +194,28 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
           setRecentActivity(allActivity);
         } else {
           console.error('Error al obtener grupos: formato de datos incorrecto', groupsData);
-          showError('Error', 'Formato de datos incorrecto');
+          error('Error', 'Formato de datos incorrecto');
           // Usar datos simulados como fallback
           setUserGroups(mockUserGroups);
           setRecentActivity(mockRecentActivity);
         }
       } else {
         console.error('Error al obtener grupos:', response.error);
-        showError('Error', 'No se pudieron cargar tus grupos');
+        error('Error', 'No se pudieron cargar tus grupos');
         // Usar datos simulados como fallback
         setUserGroups(mockUserGroups);
         setRecentActivity(mockRecentActivity);
       }
     } catch (error) {
       console.error('Error al obtener grupos:', error);
-      showError('Error', 'No se pudieron cargar tus grupos');
+      error('Error', 'No se pudieron cargar tus grupos');
       // Usar datos simulados como fallback
       setUserGroups(mockUserGroups);
       setRecentActivity(mockRecentActivity);
     } finally {
       setIsLoadingGroups(false);
     }
-  }, [getAuthHeaders, showError]);
+  }, [getAuthHeaders, error]);
 
   // Cargar grupos del usuario
   useEffect(() => {
@@ -227,19 +230,19 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
   }, []); // Solo ejecutar una vez al montar el componente
 
   const handleJoinGroup = () => {
-    showInfo('Unirse a grupo', 'Funcionalidad en desarrollo');
+    info('Unirse a grupo', 'Funcionalidad en desarrollo');
   };
 
   const handleCreateGroup = () => {
     if (onCreateGroup) {
       onCreateGroup();
     } else {
-      showInfo('Crear grupo', 'Funcionalidad en desarrollo');
+      info('Crear grupo', 'Funcionalidad en desarrollo');
     }
   };
 
   const handleSeriesPress = (series) => {
-    showInfo('Serie seleccionada', `Has seleccionado ${series.name}`);
+    info('Serie seleccionada', `Has seleccionado ${series.name}`);
   };
 
   const handleGroupPress = (group) => {
@@ -250,7 +253,7 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
   };
 
   const handleActivityPress = (activity) => {
-    showInfo('Actividad', `Actividad en ${activity.series_name || activity.series}`);
+    info('Actividad', `Actividad en ${activity.series_name || activity.series}`);
   };
 
   const renderActivityItem = (activity) => {
@@ -261,8 +264,9 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
       console.error('Actividad inválida:', activity);
       return null;
     }
-    
+    console.log('🔍 Activity type:', activity.type);
     switch (activity.type) {
+
       case 'episode_watched':
         icon = <Ionicons name="play-circle" size={20} color={colors.success[500]} />;
         title = `${activity.name || 'Usuario'} vio ${activity.episode_name || 'un episodio'}`;
@@ -298,6 +302,11 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
         title = `${activity.name || 'Usuario'} creó el grupo`;
         subtitle = `${formatTimeAgo(activity.created_at)} • ${activity.groupName || 'Grupo'}`;
         break;
+      case 'series_added':
+        icon = <Ionicons name="add-circle" size={20} color={colors.success[500]} />;
+        title = `${activity.name || 'Usuario'} añadió ${activity.series_name || 'una serie'}`;
+        subtitle = `${formatTimeAgo(activity.created_at)} • ${activity.groupName || 'Grupo'}`;
+        break;
       default:
         icon = <Ionicons name="ellipse" size={20} color={colors.info[500]} />;
         title = "Actividad";
@@ -305,9 +314,8 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
     }
 
     return (
-      <TouchableOpacity 
-        onPress={() => handleActivityPress(activity)}
-        style={[styles.listItem, { 
+      <View
+        style={[styles.listItem, {
           paddingVertical: 12,
           paddingHorizontal: 16,
           marginBottom: 8,
@@ -320,7 +328,7 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
           <Text style={styles.listItemTitle}>{title}</Text>
           <Text style={styles.listItemSubtitle}>{subtitle}</Text>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -725,7 +733,7 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
               ))
             ) : recentActivity.length > 0 ? (
               recentActivity
-                .filter(activity => activity && typeof activity === 'object' && activity.type)
+                .filter(a => a && typeof a === 'object' && !Array.isArray(a))
                 .map((activity, index) => (
                   <View key={`${activity.type}-${activity.series_name || activity.series || activity.id || index}`}>
                     {renderActivityItem(activity)}

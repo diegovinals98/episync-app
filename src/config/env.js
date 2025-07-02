@@ -51,6 +51,9 @@ export const ENV = {
   // Características
   ENABLE_ANALYTICS: process.env.ENABLE_ANALYTICS === 'true' || defaultConfig.ENABLE_ANALYTICS,
   ENABLE_CRASH_REPORTING: process.env.ENABLE_CRASH_REPORTING === 'true' || defaultConfig.ENABLE_CRASH_REPORTING,
+  
+  // Socket
+  SOCKET_URL: 'http://localhost:4000',
 };
 
 export default ENV; 

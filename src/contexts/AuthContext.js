@@ -7,6 +7,8 @@ import Constants from 'expo-constants';
 import { apiService } from '../services/api.service';
 import { ENDPOINTS } from '../config/api';
 import { ENV } from '../config/env';
+import { useToast } from './ToastContext';
+import socketService from '../services/socket.service';
 
 // Configurar WebBrowser para auth
 WebBrowser.maybeCompleteAuthSession();
@@ -29,6 +31,7 @@ const GOOGLE_CLIENT_ID = ENV.GOOGLE_CLIENT_ID;
 const APPLE_CLIENT_ID = ENV.APPLE_CLIENT_ID;
 
 export const AuthProvider = ({ children }) => {
+  const { success, error } = useToast();
   const [user, setUser] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const [refreshToken, setRefreshToken] = useState(null);
@@ -99,10 +102,17 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
 
       console.log('Tokens cargados correctamente');
-      console.log('storedAccessToken', storedAccessToken);
-      console.log('storedRefreshToken', storedRefreshToken);
-      console.log('storedUserString', storedUserString);
-      
+
+      // Conectar al socket después de cargar los tokens
+      try {
+        console.log('🔌 Conectando al socket (global) después de cargar tokens...');
+        await socketService.connect('global', storedAccessToken);
+        console.log('✅ Socket conectado exitosamente después de cargar tokens');
+      } catch (socketError) {
+        console.error('❌ Error conectando al socket después de cargar tokens:', socketError);
+        console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+      }
+
       // Verificar si el token sigue siendo válido
       try {
         const isValid = await validateToken(storedAccessToken);
@@ -188,6 +198,17 @@ export const AuthProvider = ({ children }) => {
         
         await saveTokens(mockAccessToken, mockRefreshToken, mockUser);
         
+        // Conectar al socket después del login exitoso
+        try {
+          console.log('🔌 Conectando al socket (global) después del login...');
+          await socketService.connect('global', mockAccessToken);
+          console.log('✅ Socket conectado exitosamente después del login');
+        } catch (socketError) {
+          console.error('❌ Error conectando al socket después del login:', socketError);
+          console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+        }
+        
+        success('Login exitoso', 'Bienvenido de vuelta!');
         return { success: true };
       }
       
@@ -216,9 +237,21 @@ export const AuthProvider = ({ children }) => {
       
       await saveTokens(accessToken, refreshToken, userData);
       
+      // Conectar al socket después del login exitoso
+      try {
+        console.log('🔌 Conectando al socket (global) después del login...');
+        await socketService.connect('global', accessToken);
+        console.log('✅ Socket conectado exitosamente después del login');
+      } catch (socketError) {
+        console.error('❌ Error conectando al socket después del login:', socketError);
+        console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+      }
+      
+      success('Login exitoso', 'Bienvenido de vuelta!');
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
+      error('Error de conexión', 'No se pudo conectar al servidor');
       return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
@@ -265,6 +298,17 @@ export const AuthProvider = ({ children }) => {
         
         await saveTokens(mockAccessToken, mockRefreshToken, mockUser);
         
+        // Conectar al socket después del login exitoso
+        try {
+          console.log('🔌 Conectando al socket (global) después del login...');
+          await socketService.connect('global', mockAccessToken);
+          console.log('✅ Socket conectado exitosamente después del login');
+        } catch (socketError) {
+          console.error('❌ Error conectando al socket después del login:', socketError);
+          console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+        }
+        
+        success('Login exitoso', 'Bienvenido de vuelta!');
         return { success: true };
       }
       
@@ -284,6 +328,17 @@ export const AuthProvider = ({ children }) => {
       
       await saveTokens(access, refresh, userData);
       
+      // Conectar al socket después del login exitoso
+      try {
+        console.log('🔌 Conectando al socket (global) después del login...');
+        await socketService.connect('global', access);
+        console.log('✅ Socket conectado exitosamente después del login');
+      } catch (socketError) {
+        console.error('❌ Error conectando al socket después del login:', socketError);
+        console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+      }
+      
+      success('Login exitoso', 'Bienvenido de vuelta!');
       return { success: true };
     } catch (error) {
       console.error('Google auth error:', error);
@@ -317,6 +372,17 @@ export const AuthProvider = ({ children }) => {
         
         await saveTokens(mockAccessToken, mockRefreshToken, mockUser);
         
+        // Conectar al socket después del login exitoso
+        try {
+          console.log('🔌 Conectando al socket (global) después del login...');
+          await socketService.connect('global', mockAccessToken);
+          console.log('✅ Socket conectado exitosamente después del login');
+        } catch (socketError) {
+          console.error('❌ Error conectando al socket después del login:', socketError);
+          console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+        }
+        
+        success('Login exitoso', 'Bienvenido de vuelta!');
         return { success: true };
       }
       
@@ -358,6 +424,17 @@ export const AuthProvider = ({ children }) => {
         
         await saveTokens(mockAccessToken, mockRefreshToken, mockUser);
         
+        // Conectar al socket después del login exitoso
+        try {
+          console.log('🔌 Conectando al socket (global) después del login...');
+          await socketService.connect('global', mockAccessToken);
+          console.log('✅ Socket conectado exitosamente después del login');
+        } catch (socketError) {
+          console.error('❌ Error conectando al socket después del login:', socketError);
+          console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+        }
+        
+        success('Registro exitoso', 'Bienvenido!');
         return { success: true };
       }
       
@@ -391,6 +468,17 @@ export const AuthProvider = ({ children }) => {
       
       await saveTokens(accessToken, refreshToken, userData);
       
+      // Conectar al socket después del login exitoso
+      try {
+        console.log('🔌 Conectando al socket (global) después del login...');
+        await socketService.connect('global', accessToken);
+        console.log('✅ Socket conectado exitosamente después del login');
+      } catch (socketError) {
+        console.error('❌ Error conectando al socket después del login:', socketError);
+        console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+      }
+      
+      success('Registro exitoso', 'Bienvenido!');
       return { success: true };
     } catch (error) {
       console.error('Register error:', error);
@@ -422,7 +510,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error(response.message || 'Token refresh failed');
       }
 
-      console.log('refresh response', response);
       
       // La respuesta tiene una estructura doblemente anidada: response.data.data
       let responseData;
@@ -463,6 +550,17 @@ export const AuthProvider = ({ children }) => {
         userData || user // Usar los nuevos datos de usuario o mantener los actuales
       );
       
+      // Reconectar el socket con el nuevo token
+      try {
+        console.log('🔌 Reconectando socket (global) después de refrescar token...');
+        await socketService.disconnect(); // Desconectar primero
+        await socketService.connect('global', accessToken);
+        console.log('✅ Socket reconectado exitosamente después de refrescar token');
+      } catch (socketError) {
+        console.error('❌ Error reconectando socket después de refrescar token:', socketError);
+        console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+      }
+      
       return true;
     } catch (error) {
       console.error('Token refresh error:', error);
@@ -474,18 +572,21 @@ export const AuthProvider = ({ children }) => {
   // Logout
   const logout = async () => {
     try {
-      // Revocar token en el servidor si es necesario
-      if (refreshToken) {
-        await apiService.post(ENDPOINTS.auth.logout, { refreshToken });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
+      // Desconectar el socket antes del logout
+      socketService.disconnect();
+      console.log('🔌 Socket desconectado durante logout');
+      
+      await AsyncStorage.removeItem('accessToken');
+      await AsyncStorage.removeItem('refreshToken');
+      await AsyncStorage.removeItem('user');
       setUser(null);
       setAccessToken(null);
       setRefreshToken(null);
       setIsAuthenticated(false);
-      await clearTokens();
+      success('Logout exitoso', 'Sesión cerrada correctamente');
+    } catch (error) {
+      console.error('Logout error:', error);
+      error('Error', 'No se pudo cerrar la sesión');
     }
   };
 

@@ -44,6 +44,8 @@ export const ENDPOINTS = {
     series: '/api/v1/groups',
     members: '/api/v1/groups',
     user: '/api/v1/groups/user',
+    progress: (groupId, seriesId) => `/api/v1/groups/${groupId}/series/${seriesId}/progress`,
+    episodesWatched: (groupId, seriesId, seasonNumber) => `/api/v1/groups/${groupId}/series/${seriesId}/season/${seasonNumber}/episodes-watched`,
   },
   series: {
     popular: '/series/popular',
@@ -51,7 +53,7 @@ export const ENDPOINTS = {
     details: (seriesId) => `/series/${seriesId}`,
   },
   tmdb: {
-    search: '/api/v1/tmdb/search/tv',
+    search: 'https://api.themoviedb.org/3/search/tv',
   },
   episodes: {
     markWatched: (episodeId) => `/episodes/${episodeId}/watched`,

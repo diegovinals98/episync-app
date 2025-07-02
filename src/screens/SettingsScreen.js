@@ -23,7 +23,7 @@ const SettingsScreen = ({ onBack }) => {
   const { isDarkMode, themeMode, setThemeMode } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
   const { user, logout } = useAuth();
-  const { success: showSuccess, error: showError } = useToast();
+  const { success, error } = useToast();
   const styles = createComponentStyles(isDarkMode);
 
   // Estado de perfil
@@ -43,21 +43,21 @@ const SettingsScreen = ({ onBack }) => {
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setProfileImage(result.assets[0].uri);
-        showSuccess('Foto actualizada', 'Tu foto de perfil se ha actualizado correctamente');
+        success('Foto actualizada', 'Tu foto de perfil se ha actualizado correctamente');
       }
     } catch (error) {
-      showError('Error', 'No se pudo actualizar la foto de perfil');
+      error('Error', 'No se pudo actualizar la foto de perfil');
     }
   };
 
   // Guardar cambios (simulado)
   const handleSave = () => {
-    showSuccess('Cambios guardados', 'Tus cambios han sido guardados correctamente');
+    success('Cambios guardados', 'Tus cambios han sido guardados correctamente');
   };
 
   // Cerrar sesión
   const handleLogout = () => {
-    showError('Cerrar Sesión', '¿Estás seguro de que quieres cerrar sesión?', 5000);
+    error('Cerrar Sesión', '¿Estás seguro de que quieres cerrar sesión?', 5000);
     // Aquí podrías mostrar un modal de confirmación en lugar de un toast
     // Por ahora, cerramos directamente
     setTimeout(async () => {

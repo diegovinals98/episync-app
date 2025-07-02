@@ -234,8 +234,49 @@ class ApiService {
    */
   async searchTMDBSeries(query, headers = {}) {
     try {
-      const response = await this.get(`${ENDPOINTS.tmdb.search}?query=${encodeURIComponent(query)}`, headers);
-      return this.normalizeResponse(response);
+      // Parámetros para la búsqueda de TMDB
+      const params = new URLSearchParams({
+        query: query,
+        include_adult: 'false',
+        language: 'en-US',
+        page: '1'
+      });
+
+      // Headers específicos para TMDB
+      const tmdbHeaders = {
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1YmRhYzE1NTQ1ZjUzNzM2ZDUyZTk3MTE1NDI0NTExNSIsIm5iZiI6MTc1MTM3ODA3Ny40ODMsInN1YiI6IjY4NjNlODlkZDljYTA2ZmNlZmY4M2VkMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.9nsGIEk6ApFEVetd-9yIfFes8bclTPu-jsgdqc7G9mk',
+        'accept': 'application/json',
+        ...headers
+      };
+
+      const url = `${ENDPOINTS.tmdb.search}?${params.toString()}`;
+      console.log('🔍 TMDB URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tmdbHeaders,
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          status: response.status,
+          message: data.status_message || 'Error en la búsqueda de TMDB',
+          data: null,
+          error: data,
+        };
+      }
+
+      // TMDB devuelve los resultados en data.results
+      return {
+        success: true,
+        status: response.status,
+        message: 'Búsqueda exitosa',
+        data: data.results || [],
+        error: null,
+      };
     } catch (error) {
       return this.handleError(error);
     }
@@ -250,7 +291,9 @@ class ApiService {
    */
   async addSeriesToGroup(groupId, seriesData, headers = {}) {
     try {
+      console.log('🔍 Calling endpoint:', `${ENDPOINTS.groups.series}/${groupId}/series`);
       const response = await this.post(`${ENDPOINTS.groups.series}/${groupId}/series`, seriesData, headers);
+      console.log('🔍 Response:', response);
       return this.normalizeResponse(response);
     } catch (error) {
       return this.handleError(error);
@@ -335,6 +378,136 @@ class ApiService {
       data: null,
       error: error.message,
     };
+  }
+
+  /**
+   * Obtiene los detalles de una serie desde TMDB
+   * @param {number} tmdbId - ID de TMDB de la serie
+   * @param {Object} headers - Headers adicionales
+   * @returns {Promise} La respuesta con los detalles de la serie
+   */
+  async getTMDBSeriesDetails(tmdbId, headers = {}) {
+    try {
+      // Headers específicos para TMDB
+      const tmdbHeaders = {
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1YmRhYzE1NTQ1ZjUzNzM2ZDUyZTk3MTE1NDI0NTExNSIsIm5iZiI6MTc1MTM3ODA3Ny40ODMsInN1YiI6IjY4NjNlODlkZDljYTA2ZmNlZmY4M2VkMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.9nsGIEk6ApFEVetd-9yIfFes8bclTPu-jsgdqc7G9mk',
+        'accept': 'application/json',
+        ...headers
+      };
+
+      const url = `https://api.themoviedb.org/3/tv/${tmdbId}?language=en-US`;
+      console.log('🔍 TMDB Series Details URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tmdbHeaders,
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          status: response.status,
+          message: data.status_message || 'Error al obtener detalles de la serie',
+          data: null,
+          error: data,
+        };
+      }
+
+      return {
+        success: true,
+        status: response.status,
+        message: 'Detalles de serie obtenidos exitosamente',
+        data: data,
+        error: null,
+      };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * Obtiene los episodios de una temporada específica de TMDB
+   * @param {number} tmdbId - ID de TMDB de la serie
+   * @param {number} seasonNumber - Número de temporada
+   * @param {Object} headers - Headers adicionales
+   * @returns {Promise} La respuesta con los episodios de la temporada
+   */
+  async getTMDBSeasonEpisodes(tmdbId, seasonNumber, headers = {}) {
+    try {
+      // Headers específicos para TMDB
+      const tmdbHeaders = {
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1YmRhYzE1NTQ1ZjUzNzM2ZDUyZTk3MTE1NDI0NTExNSIsIm5iZiI6MTc1MTM3ODA3Ny40ODMsInN1YiI6IjY4NjNlODlkZDljYTA2ZmNlZmY4M2VkMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.9nsGIEk6ApFEVetd-9yIfFes8bclTPu-jsgdqc7G9mk',
+        'accept': 'application/json',
+        ...headers
+      };
+
+      const url = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}?language=en-US`;
+      console.log('🔍 TMDB Season Episodes URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: tmdbHeaders,
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          status: response.status,
+          message: data.status_message || 'Error al obtener episodios de la temporada',
+          data: null,
+          error: data,
+        };
+      }
+
+      return {
+        success: true,
+        status: response.status,
+        message: 'Episodios obtenidos exitosamente',
+        data: data,
+        error: null,
+      };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * Obtiene el progreso de los miembros de un grupo en una serie específica
+   * @param {number} groupId - ID del grupo
+   * @param {number} seriesId - ID de la serie
+   * @param {Object} headers - Headers con el token de autenticación
+   * @returns {Promise} La respuesta con el progreso de los miembros
+   */
+  async getSeriesProgress(groupId, seriesId, headers = {}) {
+    try {
+      const response = await this.get(ENDPOINTS.groups.progress(groupId, seriesId), headers);
+      console.log('🔍 Series progress response:', response);
+      return this.normalizeResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * Obtiene los episodios vistos de una temporada específica
+   * @param {number} groupId - ID del grupo
+   * @param {number} seriesId - ID de la serie
+   * @param {number} seasonNumber - Número de temporada
+   * @param {Object} headers - Headers con el token de autenticación
+   * @returns {Promise} La respuesta con los episodios vistos
+   */
+  async getEpisodesWatched(groupId, seriesId, seasonNumber, headers = {}) {
+    try {
+      const response = await this.get(ENDPOINTS.groups.episodesWatched(groupId, seriesId, seasonNumber), headers);
+      console.log('🔍 Episodes watched response:', response);
+      return this.normalizeResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 

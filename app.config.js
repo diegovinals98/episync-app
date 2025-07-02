@@ -34,7 +34,7 @@ export default {
     ],
     extra: {
       eas: {
-        projectId: "your-project-id"
+        projectId: "7d7d0dce-0db9-4c04-9cb5-a014c33c3923"
       }
     }
   }

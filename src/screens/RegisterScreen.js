@@ -23,7 +23,7 @@ const RegisterScreen = ({ onBack }) => {
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { register } = useAuth();
-  const { success: showSuccess, error: showError } = useToast();
+  const { success, error } = useToast();
   const styles = createComponentStyles(isDarkMode);
   
   const [username, setUsername] = useState('');
@@ -38,31 +38,31 @@ const RegisterScreen = ({ onBack }) => {
   // Validación de formulario
   const validateForm = () => {
     if (!username.trim()) {
-      showError('Error', 'Por favor ingresa un nombre de usuario');
+      error('Error', 'Por favor ingresa un nombre de usuario');
       return false;
     }
     if (!name.trim()) {
-      showError('Error', 'Por favor ingresa tu nombre');
+      error('Error', 'Por favor ingresa tu nombre');
       return false;
     }
     if (!lastname.trim()) {
-      showError('Error', 'Por favor ingresa tu apellido');
+      error('Error', 'Por favor ingresa tu apellido');
       return false;
     }
     if (!email.trim()) {
-      showError('Error', 'Por favor ingresa tu email');
+      error('Error', 'Por favor ingresa tu email');
       return false;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
-      showError('Error', 'Por favor ingresa un email válido');
+      error('Error', 'Por favor ingresa un email válido');
       return false;
     }
     if (!password.trim() || password.length < 6) {
-      showError('Error', 'La contraseña debe tener al menos 6 caracteres');
+      error('Error', 'La contraseña debe tener al menos 6 caracteres');
       return false;
     }
     if (password !== confirmPassword) {
-      showError('Error', 'Las contraseñas no coinciden');
+      error('Error', 'Las contraseñas no coinciden');
       return false;
     }
     return true;
@@ -75,13 +75,13 @@ const RegisterScreen = ({ onBack }) => {
     try {
       const result = await register(name, lastname, username, email, password);
       if (!result.success) {
-        showError('Error de Registro', result.error);
+        error('Error de Registro', result.error);
       } else {
-        showSuccess('¡Cuenta Creada!', 'Tu cuenta ha sido creada correctamente');
+        success('¡Cuenta Creada!', 'Tu cuenta ha sido creada correctamente');
         // El AuthContext ya maneja la autenticación automáticamente después del registro exitoso
       }
     } catch (error) {
-      showError('Error', 'Error inesperado. Inténtalo de nuevo.');
+      error('Error', 'Error inesperado. Inténtalo de nuevo.');
     } finally {
       setIsRegistering(false);
     }

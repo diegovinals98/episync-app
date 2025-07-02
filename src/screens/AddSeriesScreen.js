@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,10 +18,12 @@ import { colors } from '../styles/colors';
 import { createComponentStyles } from '../styles/components';
 import apiService from '../services/api.service';
 
-const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
-  const { group } = route?.params || {};
-  const groupIdFromProps = groupId || group?.id;
-  
+const AddSeriesScreen = ({ navigation, onBack, group }) => {
+  // Obtener el groupId solo desde la prop group
+  const groupIdFinal = group?.id;
+
+  console.log('Group ID usado en AddSeriesScreen:', groupIdFinal);
+
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { getAuthHeaders } = useAuth();
@@ -62,17 +64,53 @@ const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
     }
   }, [showError, t]);
 
+  // Debounce para evitar demasiadas llamadas a la API
+  const [searchTimeout, setSearchTimeout] = useState(null);
+
+  // Función para manejar cambios en el texto de búsqueda con debounce
+  const handleSearchTextChange = useCallback((text) => {
+    setSearchQuery(text);
+    
+    // Cancelar el timeout anterior si existe
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Si el texto está vacío, limpiar resultados inmediatamente
+    if (!text.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    // Crear nuevo timeout para buscar después de 500ms de inactividad
+    const newTimeout = setTimeout(() => {
+      searchSeries(text.trim());
+    }, 500);
+    
+    setSearchTimeout(newTimeout);
+  }, [searchTimeout, searchSeries]);
+
+  // Cleanup del timeout cuando el componente se desmonte
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
+
   // Función para añadir serie al grupo
   const addSeriesToGroup = useCallback(async (series) => {
-    if (!groupIdFromProps) {
+
+    if (!groupIdFinal) {
+      console.log('🔍 Group ID from params:', groupIdFinal);
       showError('Error', t('groupIdRequired'));
       return;
     }
-
     try {
       setIsAddingSeries(true);
       const headers = getAuthHeaders();
-      
+      console.log('🔍 Headers:', headers);
       const seriesData = {
         tmdb_id: series.id,
         name: series.name,
@@ -83,19 +121,12 @@ const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
         vote_count: series.vote_count,
         popularity: series.popularity,
       };
-
-      console.log('📺 Adding series to group:', seriesData);
-      
-      const response = await apiService.addSeriesToGroup(groupIdFromProps, seriesData, headers);
-      console.log('📺 Add series response:', response);
-      
+      console.log('🔍 Series data:', seriesData);
+      const response = await apiService.addSeriesToGroup(groupIdFinal, seriesData, headers);
       if (response.success) {
         showSuccess(t('seriesAdded'), t('seriesAddedSuccess'));
-        // Volver a la pantalla anterior
         if (onBack) {
           onBack();
-        } else if (navigation) {
-          navigation.goBack();
         }
       } else {
         showError('Error', response.message || t('addSeriesError'));
@@ -106,9 +137,9 @@ const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
     } finally {
       setIsAddingSeries(false);
     }
-  }, [groupIdFromProps, getAuthHeaders, showSuccess, showError, t, onBack, navigation]);
+  }, [groupIdFinal, getAuthHeaders, showSuccess, showError, t, onBack]);
 
-  // Función para manejar búsqueda
+  // Función para manejar búsqueda manual (botón)
   const handleSearch = () => {
     if (searchQuery.trim()) {
       searchSeries(searchQuery.trim());
@@ -117,92 +148,87 @@ const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
 
   // Función para seleccionar serie
   const handleSelectSeries = (series) => {
-    setSelectedSeries(series);
-    Alert.alert(
-      t('confirmAddSeries'),
-      `${t('addSeriesToGroup')} "${series.name}"?`,
-      [
-        { text: t('cancel'), style: 'cancel' },
-        { 
-          text: t('add'), 
-          onPress: () => addSeriesToGroup(series),
-          style: 'default'
-        }
-      ]
-    );
+    console.log('Pulsada tarjeta, añadiendo serie:', series);
+    addSeriesToGroup(series);
   };
 
   // Renderizar resultado de búsqueda
   const renderSearchResult = (series) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       key={series.id}
       onPress={() => handleSelectSeries(series)}
       style={{
         backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        flexDirection: 'row',
+        borderRadius: 16,
+        width: '48%',
+        marginBottom: 16,
+        padding: 10,
+        height: 180,
+        flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
       }}
     >
-      <View style={{
-        width: 60,
-        height: 90,
-        borderRadius: 8,
-        overflow: 'hidden',
-        marginRight: 12,
-        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-      }}>
+      {/* Carátula */}
+      <View style={{ alignItems: 'center', marginBottom: 8 }}>
         {series.poster_path ? (
-          <Image 
-            source={{ uri: `https://image.tmdb.org/t/p/w200${series.poster_path}` }} 
-            style={{ width: 60, height: 90 }}
+          <Image
+            source={{ uri: `https://image.tmdb.org/t/p/w300${series.poster_path}` }}
+            style={{ width: 80, height: 120, borderRadius: 8 }}
             resizeMode="cover"
           />
         ) : (
-          <View style={{ 
-            width: 60, 
-            height: 90, 
-            justifyContent: 'center', 
-            alignItems: 'center' 
+          <View style={{
+            width: 80,
+            height: 120,
+            borderRadius: 8,
+            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+            justifyContent: 'center',
+            alignItems: 'center',
           }}>
-            <Ionicons 
-              name="tv-outline" 
-              size={24} 
-              color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} 
+            <Ionicons
+              name="tv-outline"
+              size={28}
+              color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
             />
           </View>
         )}
       </View>
-      
-      <View style={{ flex: 1 }}>
-        <Text style={createComponentStyles(isDarkMode).listItemTitle}>
-          {series.name}
+
+      {/* Info */}
+      <Text
+        style={[
+          createComponentStyles(isDarkMode).cardTitle,
+          {
+            textAlign: 'center',
+            fontSize: 13,
+            fontWeight: '600',
+            marginBottom: 2,
+            paddingHorizontal: 2,
+          },
+        ]}
+        numberOfLines={2}
+      >
+        {series.name}
+      </Text>
+      {series.first_air_date && (
+        <Text
+          style={[
+            createComponentStyles(isDarkMode).textSecondary,
+            {
+              textAlign: 'center',
+              fontSize: 12,
+            },
+          ]}
+        >
+          {new Date(series.first_air_date).getFullYear()}
         </Text>
-        <Text style={createComponentStyles(isDarkMode).listItemSubtitle}>
-          {series.first_air_date ? new Date(series.first_air_date).getFullYear() : t('unknown')}
-        </Text>
-        {series.vote_average > 0 && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-            <Ionicons name="star" size={12} color={colors.warning[500]} />
-            <Text style={[createComponentStyles(isDarkMode).textSecondary, { marginLeft: 4 }]}>
-              {series.vote_average.toFixed(1)} ({series.vote_count} {t('votes')})
-            </Text>
-          </View>
-        )}
-        {series.overview && (
-          <Text style={[createComponentStyles(isDarkMode).textSecondary, { marginTop: 4 }]} numberOfLines={2}>
-            {series.overview}
-          </Text>
-        )}
-      </View>
-      
-      <Ionicons 
-        name="add-circle" 
-        size={24} 
-        color={colors.primary[500]} 
-      />
+      )}
     </TouchableOpacity>
   );
 
@@ -247,10 +273,8 @@ const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
         contentContainerStyle={createComponentStyles(isDarkMode).scrollContent}
       >
         {/* Barra de búsqueda */}
-        <View style={{ marginBottom: 24 }}>
-          <Text style={createComponentStyles(isDarkMode).inputLabel}>
-            {t('searchSeries')}
-          </Text>
+        <View style={{ marginBottom: 24 , marginTop: 24}}>
+          
           <View style={createComponentStyles(isDarkMode).inputContainer}>
             <Ionicons 
               name="search" 
@@ -262,7 +286,7 @@ const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
               placeholder={t('searchSeriesPlaceholder')}
               placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={handleSearchTextChange}
               onSubmitEditing={handleSearch}
               returnKeyType="search"
               autoCapitalize="none"
@@ -277,31 +301,42 @@ const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
             )}
           </View>
           
-          {searchQuery.trim() && (
-            <TouchableOpacity 
-              onPress={handleSearch}
-              style={[createComponentStyles(isDarkMode).button, { marginTop: 12 }]}
-              disabled={isSearching}
-            >
-              <Text style={createComponentStyles(isDarkMode).buttonText}>
-                {isSearching ? t('searching') : t('search')}
+          {searchQuery.trim() && isSearching && (
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              marginTop: 12,
+              padding: 12,
+              backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
+              borderRadius: 8
+            }}>
+              <ActivityIndicator size="small" color={colors.primary[500]} />
+              <Text style={[createComponentStyles(isDarkMode).textSecondary, { marginLeft: 8 }]}>
+                {t('searching')}
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
         </View>
 
         {/* Resultados de búsqueda */}
         {searchResults.length > 0 && (
           <View>
-            <Text style={createComponentStyles(isDarkMode).sectionTitle}>
+            <Text style={[createComponentStyles(isDarkMode).sectionTitle, { marginBottom: 16 }]}>
               {t('searchResults')} ({searchResults.length})
             </Text>
-            {searchResults.map(renderSearchResult)}
+            <View style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+            }}>
+              {searchResults.map(renderSearchResult)}
+            </View>
           </View>
         )}
 
         {/* Estado vacío */}
-        {searchQuery.trim() && !isSearching && searchResults.length === 0 && (
+        {searchQuery.trim() && !isSearching && searchResults.length === 0 && searchTimeout && (
           <View style={{ 
             backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
             borderRadius: 12,
@@ -339,9 +374,6 @@ const AddSeriesScreen = ({ route, navigation, onBack, groupId }) => {
             />
             <Text style={[createComponentStyles(isDarkMode).cardTitle, { marginBottom: 8, textAlign: 'center' }]}>
               {t('searchForSeries')}
-            </Text>
-            <Text style={[createComponentStyles(isDarkMode).textSecondary, { textAlign: 'center' }]}>
-              {t('searchForSeriesDescription')}
             </Text>
           </View>
         )}

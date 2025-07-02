@@ -18,12 +18,12 @@ import { createComponentStyles } from '../styles/components';
 import Skeleton from '../components/Skeleton';
 import apiService from '../services/api.service';
 
-const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) => {
+const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGroupSeriesDetail }) => {
   const groupData = group || route?.params?.group;
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { getAuthHeaders } = useAuth();
-  const { showSuccess, showError } = useToast();
+  const { success, error } = useToast();
   
   const [groupInfo, setGroupInfo] = useState(groupData);
   const [series, setSeries] = useState([]);
@@ -81,7 +81,6 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) =>
       
       // Obtener información detallada del grupo
       const groupResponse = await apiService.getGroupDetails(groupInfo.id, headers);
-      console.log('📋 Group details response:', groupResponse);
       
       if (groupResponse.success && groupResponse.normalizedData) {
         setGroupInfo(groupResponse.normalizedData);
@@ -99,13 +98,22 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) =>
       
       if (seriesResponse.success && seriesResponse.normalizedData) {
         const seriesData = Array.isArray(seriesResponse.normalizedData) ? seriesResponse.normalizedData : [];
-        console.log('✅ Series data received:', seriesData.length, 'series');
-        console.log('📋 Series data details:', JSON.stringify(seriesData, null, 2));
-        setSeries(seriesData);
+
+        // Asegurar que tmdb_id esté presente en cada serie
+        const mappedSeries = seriesData.map(series => ({
+          ...series,
+          tmdb_id: series.tmdb_id || series.id_tmdb || series.tmdb || null
+        }));
+        setSeries(mappedSeries);
       } else if (seriesResponse.success && seriesResponse.data) {
         const seriesData = Array.isArray(seriesResponse.data) ? seriesResponse.data : [];
         console.log('✅ Series data received (fallback):', seriesData.length, 'series');
-        setSeries(seriesData);
+        // Asegurar que tmdb_id esté presente en cada serie
+        const mappedSeries = seriesData.map(series => ({
+          ...series,
+          tmdb_id: series.tmdb_id || series.id_tmdb || series.tmdb || null
+        }));
+        setSeries(mappedSeries);
       } else {
         console.log('❌ No series data or error:', seriesResponse.message);
         setSeries([]);
@@ -113,12 +121,10 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) =>
       
       // Obtener miembros del grupo
       const membersResponse = await apiService.getGroupMembers(groupInfo.id, headers);
-      console.log('👥 Group members response:', membersResponse);
       
       if (membersResponse.success && membersResponse.normalizedData) {
         const membersData = Array.isArray(membersResponse.normalizedData) ? membersResponse.normalizedData : [];
-        console.log('✅ Members data received:', membersData.length, 'members');
-        console.log('📋 Members data details:', JSON.stringify(membersData, null, 2));
+
         setMembers(membersData);
       } else if (membersResponse.success && membersResponse.data) {
         const membersData = Array.isArray(membersResponse.data) ? membersResponse.data : [];
@@ -131,12 +137,12 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) =>
       
     } catch (error) {
       console.error('💥 Error fetching group data:', error);
-      showError('Error', t('errorLoadingGroupData'));
+      error('Error', t('errorLoadingGroupData'));
     } finally {
       setIsLoading(false);
       console.log('🏁 Data fetching completed');
     }
-  }, [groupInfo?.id, getAuthHeaders, showError, t]);
+  }, [groupInfo?.id, getAuthHeaders, error, t]);
 
   // Función para refrescar datos
   const onRefresh = useCallback(async () => {
@@ -157,9 +163,10 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) =>
   };
 
   // Función para manejar clic en serie
-  const handleSeriesPress = (series) => {
-    // TODO: Navegar a detalles de la serie
-    Alert.alert(series.name, t('seriesDetailsComingSoon'));
+  const handleSeriesPress = (seriesItem) => {
+    if (onGroupSeriesDetail && typeof onGroupSeriesDetail === 'function') {
+      onGroupSeriesDetail('GroupSeriesDetail', { group: groupInfo, series: seriesItem, members });
+    }
   };
 
   // Función para manejar clic en miembro
@@ -190,8 +197,8 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) =>
 
   // Renderizar información del grupo
   const renderGroupInfo = () => (
-    <View style={[createComponentStyles(isDarkMode).card, { marginBottom: 24 }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+    <View style={[createComponentStyles(isDarkMode).card]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center'}}>
         <View style={{
           width: 80,
           height: 80,
@@ -247,12 +254,11 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) =>
       </View>
       
       {groupInfo?.description && (
-        <Text style={[createComponentStyles(isDarkMode).textSecondary, { marginBottom: 16 }]}>
-          {groupInfo.description}
+        <Text style={[createComponentStyles(isDarkMode).textSecondary]}>
+          {groupInfo.description.length > 100 ? groupInfo.description.substring(0, 100) + '...' : groupInfo.description}
         </Text>
       )}
       
-     
     </View>
   );
 
@@ -529,7 +535,7 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries }) =>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={createComponentStyles(isDarkMode).listItemTitle}>
-                    {member.name || member.username || member.full_name || t('member')}
+                    { member.full_name || member.name || member.username || t('member')}
                   </Text>
                   <Text style={createComponentStyles(isDarkMode).listItemSubtitle}>
                     {member.series_watching || member.series_count || 0} {t('series')} • {member.episodes_watched || member.episodes_count || 0} {t('episodes')}

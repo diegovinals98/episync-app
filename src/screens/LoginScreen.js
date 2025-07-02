@@ -24,7 +24,7 @@ const LoginScreen = () => {
   const { isDarkMode, toggleTheme } = useTheme();
   const { t } = useLanguage();
   const { loginWithEmail, loginWithGoogle, isLoading } = useAuth();
-  const { error: showError, success: showSuccess } = useToast();
+  const { success, error } = useToast();
   const styles = createComponentStyles(isDarkMode);
   
   const [email, setEmail] = useState('');
@@ -35,7 +35,7 @@ const LoginScreen = () => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      showError('Error', t('pleaseCompleteFields'));
+      error('Error', t('pleaseCompleteFields'));
       return;
     }
 
@@ -43,6 +43,7 @@ const LoginScreen = () => {
     try {
       const result = await loginWithEmail(email.trim(), password);
       if (!result.success) {
+        error('Error de Login', result.error);
         showError('Error de Login', result.error);
       } else {
         showSuccess('¡Bienvenido!', 'Sesión iniciada correctamente');
@@ -114,7 +115,6 @@ const LoginScreen = () => {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
-    
 
       {/* Contenido principal */}
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 20 }}>
@@ -238,23 +238,6 @@ const LoginScreen = () => {
           </TouchableOpacity>
         </View>
         
-        {/* Botón de tema */}
-        <TouchableOpacity 
-          onPress={toggleTheme} 
-          style={{ 
-            position: 'absolute', 
-            top: 50, 
-            right: 20, 
-            width: 40, 
-            height: 40, 
-            borderRadius: 20, 
-            backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={20} color={isDarkMode ? colors.dark.text : colors.light.text} />
-        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
