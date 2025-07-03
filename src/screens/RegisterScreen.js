@@ -19,7 +19,7 @@ import { colors } from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
 import Loader from '../components/Loader';
 
-const RegisterScreen = ({ onBack }) => {
+const RegisterScreen = ({ navigation }) => {
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { register } = useAuth();
@@ -91,15 +91,6 @@ const RegisterScreen = ({ onBack }) => {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.headerButton}>
-          <Ionicons name="arrow-back" size={20} color={isDarkMode ? colors.dark.text : colors.light.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('register')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
       <ScrollView 
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
@@ -265,7 +256,7 @@ const RegisterScreen = ({ onBack }) => {
         {/* Ya tienes cuenta */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 24 }}>
           <Text style={styles.textSecondary}>{t('alreadyHaveAccount')} </Text>
-          <TouchableOpacity onPress={onBack}>
+          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
             <Text style={styles.textLink}>{t('loginHere')}</Text>
           </TouchableOpacity>
         </View>

@@ -11,7 +11,7 @@ class SocketService {
 
   /**
    * Conecta al socket y se une a un room específico
-   * @param {string} roomId - ID del room (formato: groupId+seriesId)
+   * @param {string} roomId - ID del room (formato: groupId+seriesId para series, groupId para grupos)
    * @param {string} token - Token de autenticación
    * @returns {Promise} Promise que se resuelve cuando se conecta
    */
@@ -46,8 +46,14 @@ class SocketService {
           console.log('🚪 Uniéndose al room:', roomId);
           this.isConnected = true;
           
-          // Unirse al room
-          this.joinRoom(roomId);
+          // Determinar el tipo de room y unirse apropiadamente
+          if (roomId && typeof roomId === 'string' && roomId.startsWith('user_')) {
+            this.joinUserRoom(roomId.replace('user_', ''));
+          } else if (roomId.includes('+')) {
+            this.joinRoom(roomId);
+          } else {
+            this.joinGroupRoom(roomId);
+          }
           resolve();
         });
 
@@ -75,6 +81,21 @@ class SocketService {
           this.emitEvent('episode_unwatched', data);
         });
 
+        this.socket.on('series-progress-updated', (data) => {
+          console.log('📊 Progreso de serie actualizado:', data);
+          this.emitEvent('series-progress-updated', data);
+        });
+
+        this.socket.on('episode-toggled-confirmed', (data) => {
+          console.log('✅ Episodio toggle confirmado:', data);
+          this.emitEvent('episode-toggled-confirmed', data);
+        });
+
+        this.socket.onAny((event, data) => {
+          console.log('🔄 EVENTO RECIBIDO:', event);
+          console.log('📦 DATOS:', data);
+        });
+
         this.socket.on('user_joined_room', (data) => {
           console.log('👤 Usuario se unió al room:', data);
           this.emitEvent('user_joined_room', data);
@@ -88,6 +109,37 @@ class SocketService {
         this.socket.on('room_error', (error) => {
           console.error('❌ Error en room:', error);
           this.emitEvent('room_error', error);
+        });
+
+        this.socket.on('user_joined_group', (data) => {
+          console.log('👤 Usuario se unió al grupo:', data);
+          this.emitEvent('user_joined_group', data);
+        });
+
+        this.socket.on('user_left_group', (data) => {
+          console.log('👤 Usuario salió del grupo:', data);
+          this.emitEvent('user_left_group', data);
+        });
+
+        this.socket.on('group_error', (error) => {
+          console.error('❌ Error en grupo:', error);
+          this.emitEvent('group_error', error);
+        });
+
+        this.socket.on('series-added-to-group', (data) => {
+          console.log('📺 Serie añadida al grupo:', data);
+          console.log('📊 Emitiendo evento series-added-to-group a los listeners');
+          this.emitEvent('series-added-to-group', data);
+        });
+
+        this.socket.on('series-added-error', (error) => {
+          console.error('❌ Error añadiendo serie al grupo:', error);
+          this.emitEvent('series-added-error', error);
+        });
+
+        this.socket.on('error', (error) => {
+          console.error('❌ Error genérico del socket:', error);
+          this.emitEvent('error', error);
         });
 
       } catch (error) {
@@ -115,9 +167,47 @@ class SocketService {
     });
     
     this.currentRoom = roomId;
-    this.socket.emit('join_room', { roomId });
+    this.socket.emit('join-series-room', { roomId });
     
     console.log('✅ Solicitud de unión al room enviada');
+  }
+
+  /**
+   * Se une a un room de grupo
+   * @param {string} groupId - ID del grupo
+   */
+  joinGroupRoom(groupId) {
+    if (!this.socket || !this.socket.connected) {
+      console.error('❌ Socket no conectado');
+      return;
+    }
+
+    console.log('🚪 Uniéndose al room del grupo:', groupId);
+    console.log('📊 Estado actual del socket:', {
+      connected: this.socket.connected,
+      id: this.socket.id,
+      groupId: groupId
+    });
+    
+    this.currentRoom = groupId;
+    this.socket.emit('join-group-room', { groupId });
+    
+    console.log('✅ Solicitud de unión al room del grupo enviada');
+  }
+
+  /**
+   * Se une a un room de usuario
+   * @param {string|number} userId - ID del usuario
+   */
+  joinUserRoom(userId) {
+    if (!this.socket || !this.socket.connected) {
+      console.error('❌ Socket no conectado');
+      return;
+    }
+    console.log('🚪 Uniéndose al room de usuario:', userId);
+    this.currentRoom = userId;
+    this.socket.emit('join_user_room', { userId });
+    console.log('✅ Solicitud de unión al room de usuario enviada');
   }
 
   /**
@@ -130,7 +220,7 @@ class SocketService {
     }
 
     console.log('🚪 Saliendo del room:', this.currentRoom);
-    this.socket.emit('leave_room', { roomId: this.currentRoom });
+    this.socket.emit('leave-series-room', { roomId: this.currentRoom });
     this.currentRoom = null;
     console.log('✅ Solicitud de salida del room enviada');
   }
@@ -206,6 +296,39 @@ class SocketService {
   }
 
   /**
+   * Añade una serie al grupo
+   * @param {string|number} groupId - ID real del grupo
+   * @param {Object} seriesData - Datos de la serie
+   */
+  addSeriesToGroup(groupId, seriesData) {
+    if (!this.socket || !this.isConnected) {
+      console.error('❌ Socket no conectado');
+      return;
+    }
+
+    const data = {
+      groupId: groupId,
+      roomId: this.currentRoom,
+      addSeriesDto: {
+        tmdb_id: seriesData.tmdb_id,
+        name: seriesData.name,
+        poster_url: seriesData.poster_url,
+        overview: seriesData.overview,
+        first_air_date: seriesData.first_air_date,
+        vote_average: seriesData.vote_average,
+        vote_count: seriesData.vote_count,
+        popularity: seriesData.popularity,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    console.log('📺 Añadiendo serie al grupo');
+    console.log('📊 Payload emitido:', data);
+    this.socket.emit('add_series_to_group', data);
+    console.log('✅ Evento add_series_to_group enviado');
+  }
+
+  /**
    * Agrega un listener para un evento específico
    * @param {string} event - Nombre del evento
    * @param {Function} callback - Función callback
@@ -238,14 +361,21 @@ class SocketService {
    * @param {any} data - Datos del evento
    */
   emitEvent(event, data) {
+    console.log(`📡 Emitiendo evento interno: ${event}`);
+    console.log(`📊 Datos del evento:`, data);
+    console.log(`👥 Listeners registrados para ${event}:`, this.eventListeners.has(event) ? this.eventListeners.get(event).length : 0);
+    
     if (this.eventListeners.has(event)) {
-      this.eventListeners.get(event).forEach(callback => {
+      this.eventListeners.get(event).forEach((callback, index) => {
         try {
+          console.log(`🔄 Ejecutando listener ${index + 1} para ${event}`);
           callback(data);
         } catch (error) {
-          console.error(`❌ Error en listener de ${event}:`, error);
+          console.error(`❌ Error en listener ${index + 1} de ${event}:`, error);
         }
       });
+    } else {
+      console.log(`⚠️ No hay listeners registrados para el evento: ${event}`);
     }
   }
 

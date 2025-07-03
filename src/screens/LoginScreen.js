@@ -20,7 +20,7 @@ import Skeleton from '../components/Skeleton';
 import RegisterScreen from './RegisterScreen';
 import Loader from '../components/Loader';
 
-const LoginScreen = () => {
+const LoginScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme } = useTheme();
   const { t } = useLanguage();
   const { loginWithEmail, loginWithGoogle, isLoading } = useAuth();
@@ -31,7 +31,6 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -42,43 +41,36 @@ const LoginScreen = () => {
     setIsLoggingIn(true);
     try {
       const result = await loginWithEmail(email.trim(), password);
-      if (!result.success) {
-        error('Error de Login', result.error);
-        showError('Error de Login', result.error);
-      } else {
-        showSuccess('¡Bienvenido!', 'Sesión iniciada correctamente');
+      if (result.success) {
+        success('¡Bienvenido!', 'Sesión iniciada correctamente');
       }
+      // Los errores ya se manejan en el AuthContext con toasts específicos
     } catch (error) {
-      showError('Error', 'Error inesperado. Inténtalo de nuevo.');
+      error('Error', 'Error inesperado. Inténtalo de nuevo.');
     } finally {
       setIsLoggingIn(false);
     }
   };
 
   const handleGoogleLogin = async () => {
+    setIsLoggingIn(true);
     try {
       const result = await loginWithGoogle();
       if (!result?.success) {
-        showError('Error de Google', result?.error || 'Error con Google Sign-In');
+        error('Error de Google', result?.error || 'Error con Google Sign-In');
       } else {
-        showSuccess('¡Bienvenido!', 'Sesión iniciada con Google');
+        success('¡Bienvenido!', 'Sesión iniciada con Google');
       }
     } catch (error) {
-      showError('Error', 'Error con Google Sign-In');
+      error('Error', 'Error con Google Sign-In');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleRegister = () => {
-    setShowRegister(true);
+    navigation.navigate('Register');
   };
-
-  const handleBackFromRegister = () => {
-    setShowRegister(false);
-  };
-
-  if (showRegister) {
-    return <RegisterScreen onBack={handleBackFromRegister} />;
-  }
 
   if (isLoading) {
     return (
@@ -167,7 +159,6 @@ const LoginScreen = () => {
               value={password}
               onChangeText={setPassword}
               style={styles.input}
-              placeholder="••••••••"
               placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
@@ -190,14 +181,11 @@ const LoginScreen = () => {
           {/* Botón de login */}
           <TouchableOpacity 
             onPress={handleLogin} 
-            style={[styles.button, { opacity: isLoggingIn ? 0.7 : 1 }]}
+            style={[styles.button, { opacity: isLoggingIn ? 0.7 : 1 }]} 
             disabled={isLoggingIn}
           >
             {isLoggingIn ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.buttonText}>Iniciando...</Text>
-              </View>
+              <ActivityIndicator size="small" color="white" />
             ) : (
               <Text style={styles.buttonText}>{t('loginButton')}</Text>
             )}
@@ -209,25 +197,16 @@ const LoginScreen = () => {
             <Text style={styles.separatorText}>{t('orContinueWith')}</Text>
             <View style={styles.separatorLine} />
           </View>
-          
-          {/* Botones sociales */}
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity 
-              style={[styles.buttonSecondary, { flex: 1 }]}
-              onPress={handleGoogleLogin}
-              disabled={isLoggingIn}
-            >
-              <Ionicons name="logo-google" size={18} color={isDarkMode ? colors.dark.text : colors.light.text} />
-              <Text style={styles.buttonSecondaryText}>Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.buttonSecondary, { flex: 1 }]}
-              disabled={isLoggingIn}
-            >
-              <Ionicons name="logo-apple" size={18} color={isDarkMode ? colors.dark.text : colors.light.text} />
-              <Text style={styles.buttonSecondaryText}>Apple</Text>
-            </TouchableOpacity>
-          </View>
+
+          {/* Botón de Google */}
+          <TouchableOpacity 
+            onPress={handleGoogleLogin} 
+            style={[styles.button, { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.primary[500], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16 }]} 
+            disabled={isLoggingIn}
+          >
+            <Ionicons name="logo-google" size={20} color={colors.primary[500]} style={{ marginRight: 8 }} />
+            <Text style={[styles.buttonText, { color: colors.primary[500] }]}>Google</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Registro */}

@@ -23,11 +23,11 @@ import { apiService } from '../services/api.service';
 import * as ImagePicker from 'expo-image-picker';
 import { ColorSchemeStore } from 'nativewind/dist/style-sheet/color-scheme';
 
-const CreateGroupScreen = ({ onBack, onSuccess }) => {
+const CreateGroupScreen = ({ navigation }) => {
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { user, getAuthHeaders } = useAuth();
-  const { success: showSuccess, error: showError, info: showInfo } = useToast();
+  const { success, error, info } = useToast();
   const styles = createComponentStyles(isDarkMode);
   
   // Estados para el formulario
@@ -85,12 +85,12 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
       } else {
         console.error('Error en la respuesta de búsqueda:', response);
         setSearchResults([]);
-        showError('Error', t('loadUsersError'));
+        error('Error', t('loadUsersError'));
       }
     } catch (error) {
       console.error('Error al buscar usuarios:', error);
       setSearchResults([]);
-      showError('Error', t('searchConnectionError'));
+      error('Error', t('searchConnectionError'));
     } finally {
       setIsLoadingUsers(false);
     }
@@ -134,7 +134,7 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
       // Solicitar permisos
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        showError('Permisos', t('permissionsRequired'));
+        error('Permisos', t('permissionsRequired'));
         return;
       }
 
@@ -153,7 +153,7 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
       }
     } catch (error) {
       console.error('Error al seleccionar imagen:', error);
-      showError('Error', t('imageSelectionError'));
+      error('Error', t('imageSelectionError'));
     }
   };
 
@@ -163,7 +163,7 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
       // Solicitar permisos
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        showError('Permisos', t('cameraPermissionsRequired'));
+        error('Permisos', t('cameraPermissionsRequired'));
         return;
       }
 
@@ -181,7 +181,7 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
       }
     } catch (error) {
       console.error('Error al tomar foto:', error);
-      showError('Error', t('photoError'));
+      error('Error', t('photoError'));
     }
   };
 
@@ -216,7 +216,7 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
   const handleCreateGroup = async () => {
     // Validar campos
     if (!groupName.trim()) {
-      showError('Error', t('groupNameRequired'));
+      error('Error', t('groupNameRequired'));
       return;
     }
 
@@ -247,7 +247,7 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
           }
         } catch (uploadError) {
           console.error('Error al subir imagen:', uploadError);
-          showError('Error', t('imageUploadError'));
+          error('Error', t('imageUploadError'));
         } finally {
           setIsUploadingImage(false);
         }
@@ -258,21 +258,17 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
       const response = await apiService.createGroup(groupData, headers);
       
       if (response.success) {
-        showSuccess(t('groupCreated'), t('groupCreatedSuccess'));
+        success(t('groupCreated'), t('groupCreatedSuccess'));
         
         // Llamar al callback de éxito para volver a la pantalla anterior
-        if (onSuccess) {
-          onSuccess();
-        } else if (onBack) {
-          onBack();
-        }
+        navigation.navigate('Home');
       } else {
         console.error('Error al crear grupo:', response);
-        showError('Error', response.message || t('groupCreationError'));
+        error('Error', response.message || t('groupCreationError'));
       }
     } catch (error) {
       console.error('Error al crear grupo:', error);
-      showError('Error', t('groupCreationError'));
+      error('Error', t('groupCreationError'));
     } finally {
       setIsCreating(false);
       setIsUploadingImage(false);
@@ -338,15 +334,6 @@ const CreateGroupScreen = ({ onBack, onSuccess }) => {
     <View style={styles.container}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.headerButton}>
-          <Ionicons name="arrow-back" size={20} color={isDarkMode ? colors.dark.text : colors.light.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('createGroup')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
       <ScrollView 
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}

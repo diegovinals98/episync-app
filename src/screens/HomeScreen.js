@@ -18,54 +18,13 @@ import { colors } from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../components/Skeleton';
 import { apiService } from '../services/api.service';
+import { useNavigation } from '@react-navigation/native';
+import socketService from '../services/socket.service';
 
-// Datos simulados como fallback
-const mockUserGroups = [
-  { 
-    id: 1, 
-    name: 'Familia Viñals', 
-    member_count: 4, 
-    series_count: 3,
-    is_admin: true,
-    recent_activity: [
-      { type: 'episode_watched', user_id: 2, username: 'mariavinals', name: 'María', series_name: 'The Crown', episode_name: 'S04E02', created_at: new Date(Date.now() - 7200000).toISOString() },
-      { type: 'series_completed', user_id: 3, username: 'papavinals', name: 'Papá', series_name: 'Breaking Bad', created_at: new Date(Date.now() - 86400000).toISOString() }
-    ]
-  },
-  { 
-    id: 2, 
-    name: 'Amigos Series', 
-    member_count: 8, 
-    series_count: 5,
-    is_admin: false,
-    recent_activity: [
-      { type: 'episode_watched', user_id: 5, username: 'carlos', name: 'Carlos', series_name: 'Stranger Things', episode_name: 'S04E08', created_at: new Date(Date.now() - 18000000).toISOString() },
-      { type: 'comment', user_id: 6, username: 'laura', name: 'Laura', series_name: 'Game of Thrones', comment: '¡No puedo creer ese final!', created_at: new Date(Date.now() - 43200000).toISOString() }
-    ]
-  },
-  { 
-    id: 3, 
-    name: 'Roommates', 
-    member_count: 3, 
-    series_count: 2,
-    is_admin: true,
-    recent_activity: [
-      { type: 'series_started', user_id: 7, username: 'alex', name: 'Alex', series_name: 'The Boys', created_at: new Date(Date.now() - 10800000).toISOString() }
-    ]
-  },
-];
 
-// Actividad reciente simulada como fallback
-const mockRecentActivity = mockUserGroups.flatMap(group => 
-  (group.recent_activity || []).map(activity => ({
-    ...activity,
-    groupId: group.id,
-    groupName: group.name
-  }))
-).sort((a, b) => {
-  if (!a.created_at || !b.created_at) return 0;
-  return new Date(b.created_at) - new Date(a.created_at);
-});
+
+const mockNextEpisodes = [];
+
 
 // Datos simulados para series y próximos episodios
 const popularSeries = [
@@ -75,14 +34,10 @@ const popularSeries = [
   { id: 4, name: 'The Crown', episodes: 60, image: '👑', lastEpisode: 'S03E01', progress: 45 },
 ];
 
-// Próximos episodios
-const upcomingEpisodes = [
-  { id: 1, series: 'House of the Dragon', episode: 'S02E05', date: 'Hoy, 22:00', image: '🐉' },
-  { id: 2, series: 'The Boys', episode: 'S04E06', date: 'Mañana, 21:00', image: '💥' },
-  { id: 3, series: 'Fallout', episode: 'S01E09', date: '15 Jul, 22:00', image: '☢️' },
-];
 
-const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, onAddSeries }) => {
+
+const HomeScreen = () => {
+  const navigation = useNavigation();
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { user, getAuthHeaders, authenticatedRequest } = useAuth();
@@ -105,6 +60,32 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
     hoursWatched: 78,
     groupsJoined: userGroups.length,
   };
+
+  // Conexión al room de usuario al abrir la app
+  useEffect(() => {
+    if (user && user.id) {
+      const headers = getAuthHeaders();
+      socketService.connect('user_' + user.id, headers['Authorization']);
+    }
+  }, [user]);
+
+  // Escuchar evento updated-number-series y actualizar el número de series del grupo correspondiente
+  useEffect(() => {
+    const handleUpdatedNumberSeries = (data) => {
+      if (!data || !data.groupId) return;
+      setUserGroups(prevGroups =>
+        prevGroups.map(group =>
+          group.id === data.groupId
+            ? { ...group, series_count: data.seriesCount }
+            : group
+        )
+      );
+    };
+    socketService.on('updated-number-series', handleUpdatedNumberSeries);
+    return () => {
+      socketService.off('updated-number-series', handleUpdatedNumberSeries);
+    };
+  }, []);
 
   // Función para obtener los grupos del usuario
   const fetchUserGroups = useCallback(async () => {
@@ -196,21 +177,21 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
           console.error('Error al obtener grupos: formato de datos incorrecto', groupsData);
           error('Error', 'Formato de datos incorrecto');
           // Usar datos simulados como fallback
-          setUserGroups(mockUserGroups);
+          
           setRecentActivity(mockRecentActivity);
         }
       } else {
         console.error('Error al obtener grupos:', response.error);
         error('Error', 'No se pudieron cargar tus grupos');
         // Usar datos simulados como fallback
-        setUserGroups(mockUserGroups);
+        
         setRecentActivity(mockRecentActivity);
       }
     } catch (error) {
       console.error('Error al obtener grupos:', error);
       error('Error', 'No se pudieron cargar tus grupos');
       // Usar datos simulados como fallback
-      setUserGroups(mockUserGroups);
+      
       setRecentActivity(mockRecentActivity);
     } finally {
       setIsLoadingGroups(false);
@@ -222,23 +203,16 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
     fetchUserGroups();
   }, [fetchUserGroups]);
 
-  // Exponer la función de refrescar grupos
-  useEffect(() => {
-    if (onGroupCreated) {
-      onGroupCreated(fetchUserGroups);
-    }
-  }, []); // Solo ejecutar una vez al montar el componente
-
   const handleJoinGroup = () => {
     info('Unirse a grupo', 'Funcionalidad en desarrollo');
   };
 
+  const handleSettings = () => {
+    navigation.navigate('Settings');
+  };
+
   const handleCreateGroup = () => {
-    if (onCreateGroup) {
-      onCreateGroup();
-    } else {
-      info('Crear grupo', 'Funcionalidad en desarrollo');
-    }
+    navigation.navigate('CreateGroup');
   };
 
   const handleSeriesPress = (series) => {
@@ -246,10 +220,7 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
   };
 
   const handleGroupPress = (group) => {
-    // Navegar a la pantalla de detalles del grupo
-    if (onGroupDetail && typeof onGroupDetail === 'function') {
-      onGroupDetail('GroupDetail', { group });
-    }
+    navigation.navigate('GroupDetail', { group });
   };
 
   const handleActivityPress = (activity) => {
@@ -520,7 +491,7 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
             <Text style={styles.headerTitle}>{fullName}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={onSettings} style={styles.headerButton}>
+        <TouchableOpacity onPress={handleSettings} style={styles.headerButton}>
           <Ionicons name="settings-outline" size={20} color={isDarkMode ? colors.dark.text : colors.light.text} />
         </TouchableOpacity>
       </View>
@@ -757,42 +728,55 @@ const HomeScreen = ({ onSettings, onCreateGroup, onGroupCreated, onGroupDetail, 
               <Text style={styles.sectionTitle}>{t('upcomingEpisodes')}</Text>
             </View>
             
-            {upcomingEpisodes
-              .filter(episode => episode && typeof episode === 'object' && episode.id)
-              .map((episode) => (
-                <TouchableOpacity 
-                  key={episode.id}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-                    borderRadius: 12,
-                    padding: 16,
-                    marginBottom: 8,
-                  }}
-                >
-                  <View style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginRight: 12,
-                  }}>
-                    <Text style={{ fontSize: 20 }}>{episode.image || '📺'}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.listItemTitle}>{episode.series || 'Serie'}</Text>
-                    <Text style={styles.listItemSubtitle}>{episode.episode || 'Episodio'}</Text>
-                  </View>
-                  <View>
-                    <Text style={[styles.listItemSubtitle, { color: colors.primary[500], fontWeight: '600' }]}>
-                      {episode.date || 'Próximamente'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+            {mockNextEpisodes.length > 0 ? (
+              mockNextEpisodes
+                .filter(episode => episode && typeof episode === 'object' && episode.id)
+                .map((episode) => (
+                  <TouchableOpacity 
+                    key={episode.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
+                      borderRadius: 12,
+                      padding: 16,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <View style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginRight: 12,
+                    }}>
+                      <Text style={{ fontSize: 20 }}>{episode.image || '📺'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.listItemTitle}>{episode.series || 'Serie'}</Text>
+                      <Text style={styles.listItemSubtitle}>{episode.episode || 'Episodio'}</Text>
+                    </View>
+                    <View>
+                      <Text style={[styles.listItemSubtitle, { color: colors.primary[500], fontWeight: '600' }]}>
+                        {episode.date || 'Próximamente'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+            ) : (
+              <View style={{ 
+                backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
+                borderRadius: 12,
+                padding: 16,
+                alignItems: 'center',
+              }}>
+                <Text style={[styles.listItemSubtitle, { textAlign: 'center' }]}>
+                  No hay próximos episodios
+                </Text>
+              </View>
+            )}
           </>
         ) : (
           <>

@@ -283,24 +283,6 @@ class ApiService {
   }
 
   /**
-   * Añade una serie a un grupo
-   * @param {number} groupId - ID del grupo
-   * @param {Object} seriesData - Datos de la serie a añadir
-   * @param {Object} headers - Headers con el token de autenticación
-   * @returns {Promise} La respuesta con la serie añadida
-   */
-  async addSeriesToGroup(groupId, seriesData, headers = {}) {
-    try {
-      console.log('🔍 Calling endpoint:', `${ENDPOINTS.groups.series}/${groupId}/series`);
-      const response = await this.post(`${ENDPOINTS.groups.series}/${groupId}/series`, seriesData, headers);
-      console.log('🔍 Response:', response);
-      return this.normalizeResponse(response);
-    } catch (error) {
-      return this.handleError(error);
-    }
-  }
-
-  /**
    * Normaliza una respuesta de la API para facilitar el acceso a los datos
    * @param {Object} response - La respuesta original
    * @returns {Object} La respuesta normalizada

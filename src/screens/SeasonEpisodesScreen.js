@@ -10,7 +10,8 @@ import { createComponentStyles } from '../styles/components';
 import { colors } from '../styles/colors';
 import Skeleton from '../components/Skeleton';
 
-const SeasonEpisodesScreen = ({ onBack, group, series, season, members }) => {
+const SeasonEpisodesScreen = ({ navigation, route }) => {
+  const { group, series, season, members } = route?.params || {};
   const { isDarkMode } = useTheme();
   const { user, accessToken } = useAuth();
   const { success, error } = useToast();
@@ -150,6 +151,40 @@ const SeasonEpisodesScreen = ({ onBack, group, series, season, members }) => {
       });
     };
 
+    const handleEpisodeToggledConfirmed = (data) => {
+      console.log('✅ Episodio toggle confirmado por el servidor:', data);
+      // Actualizar el estado del botón basado en la confirmación del servidor
+      setEpisodeWatchedState(prev => ({
+        ...prev,
+        [data.episodeId]: data.watched
+      }));
+      
+      // Actualizar el Set de episodios vistos
+      setWatchedEpisodes(prevWatched => {
+        const newWatched = new Set(prevWatched);
+        if (data.watched) {
+          newWatched.add(data.episodeId);
+        } else {
+          newWatched.delete(data.episodeId);
+        }
+        return newWatched;
+      });
+    };
+
+    const handleSeriesProgressUpdated = (data) => {
+      console.log('📊 Progreso de serie actualizado en tiempo real:', data);
+      
+      // Verificar que los datos correspondan a la serie actual
+      if (data.groupId === group?.id && data.seriesId === series?.id) {
+        console.log('✅ Actualizando progreso para la serie actual en episodios');
+        
+        // Aquí podrías actualizar el progreso de los miembros si lo necesitas
+        // Por ahora solo mostramos el log
+      } else {
+        console.log('ℹ️ Actualización de progreso para otra serie/grupo, ignorando');
+      }
+    };
+
     const handleUserJoined = (data) => {
       console.log('👤 Usuario se unió al room:', data);
       success('Usuario conectado', `${data.username} se unió a la sesión`);
@@ -168,6 +203,8 @@ const SeasonEpisodesScreen = ({ onBack, group, series, season, members }) => {
     // Registrar listeners
     socketService.on('episode_watched', handleEpisodeWatched);
     socketService.on('episode_unwatched', handleEpisodeUnwatched);
+    socketService.on('episode-toggled-confirmed', handleEpisodeToggledConfirmed);
+    socketService.on('series-progress-updated', handleSeriesProgressUpdated);
     socketService.on('user_joined_room', handleUserJoined);
     socketService.on('user_left_room', handleUserLeft);
     socketService.on('room_error', handleRoomError);
@@ -176,6 +213,8 @@ const SeasonEpisodesScreen = ({ onBack, group, series, season, members }) => {
     return () => {
       socketService.off('episode_watched', handleEpisodeWatched);
       socketService.off('episode_unwatched', handleEpisodeUnwatched);
+      socketService.off('episode-toggled-confirmed', handleEpisodeToggledConfirmed);
+      socketService.off('series-progress-updated', handleSeriesProgressUpdated);
       socketService.off('user_joined_room', handleUserJoined);
       socketService.off('user_left_room', handleUserLeft);
       socketService.off('room_error', handleRoomError);
@@ -233,34 +272,7 @@ const SeasonEpisodesScreen = ({ onBack, group, series, season, members }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: isDarkMode ? colors.dark.background : colors.light.background }]}> 
-      {/* Header */}
-      <View style={[styles.header, { borderBottomWidth: 1, borderBottomColor: isDarkMode ? colors.dark.border : colors.light.border }]}> 
-        <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary, justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="arrow-back" size={24} color={isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary} />
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[styles.headerTitle, { color: isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary }]}> 
-            {series?.name}
-          </Text>
-          <Text style={[styles.textSecondary, { fontSize: 14, color: isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary }]}>
-            {season?.name}
-          </Text>
-        </View>
-        <View style={{ 
-          width: 40, 
-          height: 40, 
-          borderRadius: 20, 
-          backgroundColor: socketService.getConnectionStatus() ? colors.success[500] : colors.error[500],
-          justifyContent: 'center', 
-          alignItems: 'center' 
-        }}>
-          <Ionicons 
-            name={socketService.getConnectionStatus() ? "wifi" : "wifi-outline"} 
-            size={20} 
-            color="white" 
-          />
-        </View>
-      </View>
+      {/* Eliminar el header personalizado - usar header nativo de React Navigation */}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent]}>
         {/* Info de la temporada */}

@@ -17,9 +17,10 @@ import { colors } from '../styles/colors';
 import { createComponentStyles } from '../styles/components';
 import Skeleton from '../components/Skeleton';
 import apiService from '../services/api.service';
+import socketService from '../services/socket.service';
 
-const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGroupSeriesDetail }) => {
-  const groupData = group || route?.params?.group;
+const GroupDetailScreen = ({ route, navigation }) => {
+  const groupData = route?.params?.group;
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { getAuthHeaders } = useAuth();
@@ -30,16 +31,11 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGr
   const [members, setMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('series'); // 'series' or 'members'
+  const [activeTab, setActiveTab] = useState('series');
+  const [socketConnected, setSocketConnected] = useState(false); // 'series' or 'members'
 
   // Configurar el header de navegación
   useEffect(() => {
-    if (onBack) {
-      // Si estamos usando navegación personalizada
-      return;
-    }
-    
-    // Si estamos usando React Navigation
     if (navigation) {
       navigation.setOptions({
         title: groupInfo?.name || t('group'),
@@ -69,7 +65,7 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGr
         ),
       });
     }
-  }, [navigation, groupInfo, isDarkMode, t, onBack]);
+  }, [navigation, groupInfo, isDarkMode, t]);
 
   // Función para obtener los datos del grupo
   const fetchGroupData = useCallback(async () => {
@@ -156,6 +152,141 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGr
     fetchGroupData();
   }, [fetchGroupData]);
 
+  // Conectar al room del grupo cuando se monta el componente
+  useEffect(() => {
+    const connectToGroupRoom = async () => {
+      if (!groupInfo?.id) {
+        console.log('❌ No hay ID de grupo para conectar al room');
+        return;
+      }
+
+      try {
+        console.log('🚪 Conectando al room del grupo:', groupInfo.id);
+        
+        // Generar room ID para el grupo (solo groupId)
+        const groupRoomId = groupInfo.id.toString();
+        
+        // Conectar al room del grupo
+        await socketService.connect(groupRoomId, getAuthHeaders()['Authorization']);
+        setSocketConnected(true);
+        console.log('✅ Conectado exitosamente al room del grupo');
+      } catch (error) {
+        console.error('❌ Error conectando al room del grupo:', error);
+        setSocketConnected(false);
+      }
+    };
+
+    // Solo conectar si ya tenemos los datos del grupo cargados
+    if (groupInfo?.id && !isLoading) {
+      connectToGroupRoom();
+    }
+
+    // Cleanup al desmontar
+    return () => {
+      if (socketConnected) {
+        console.log('🚪 Desconectando del room del grupo al salir');
+        socketService.disconnect();
+        setSocketConnected(false);
+      }
+    };
+  }, [groupInfo?.id, isLoading, getAuthHeaders]);
+
+  // Configurar listeners de socket para eventos del grupo
+  useEffect(() => {
+    const handleUserJoinedGroup = (data) => {
+      console.log('👤 Usuario se unió al grupo:', data);
+      success('Usuario conectado', `${data.username} se unió al grupo`);
+    };
+
+    const handleUserLeftGroup = (data) => {
+      console.log('👤 Usuario salió del grupo:', data);
+      success('Usuario desconectado', `${data.username} salió del grupo`);
+    };
+
+    const handleGroupError = (error) => {
+      console.error('❌ Error en grupo:', error);
+      error('Error de grupo', error.message);
+    };
+
+    const handleGenericError = (errorData) => {
+      console.log('❌ Error genérico recibido en GroupDetail:', errorData);
+      error('Error', errorData.message);
+    };
+
+    const handleSeriesAddedToGroup = async (data) => {
+      console.log('📺 Nueva serie añadida al grupo:', data);
+      console.log('📊 Datos completos del evento:', JSON.stringify(data, null, 2));
+      
+      // Extraer los datos de la serie del evento
+      let seriesData;
+      if (data.success && data.data) {
+        seriesData = data.data;
+        success('Serie añadida', data.message || `${seriesData.series_name} se añadió al grupo`);
+      } else {
+        seriesData = data;
+        success('Serie añadida', `${seriesData.name || seriesData.series_name} se añadió al grupo`);
+      }
+      // Construir poster_url si viene poster_path pero no poster_url
+      let poster_url = seriesData.poster_url;
+      if (!poster_url && seriesData.poster_path) {
+        poster_url = `https://image.tmdb.org/t/p/w500${seriesData.poster_path}`;
+      }
+      // Añadir la serie con los datos mínimos (si no está duplicada)
+      setSeries(prevSeries => {
+        const isDuplicate = prevSeries.some(series => 
+          series.id === seriesData.id || 
+          series.series_id === seriesData.series_id ||
+          series.tmdb_id === seriesData.tmdb_id
+        );
+        if (isDuplicate) {
+          return prevSeries;
+        }
+        return [...prevSeries, { ...seriesData, poster_url, loadingDetails: true }];
+      });
+      setGroupInfo(prevGroupInfo => ({
+        ...prevGroupInfo,
+        series_count: (prevGroupInfo.series_count || 0) + 1
+      }));
+      if (seriesData.tmdb_id) {
+        try {
+          const response = await apiService.getTMDBSeriesDetails(seriesData.tmdb_id);
+          if (response.success && response.data) {
+            const poster_url = response.data.poster_path
+              ? `https://image.tmdb.org/t/p/w500${response.data.poster_path}`
+              : null;
+            setSeries(prevSeries =>
+              prevSeries.map(s =>
+                s.tmdb_id === seriesData.tmdb_id
+                  ? { ...s, ...response.data, poster_url, loadingDetails: false }
+                  : s
+              )
+            );
+          }
+        } catch (err) {
+          console.error('❌ Error al obtener detalles de la serie desde TMDB:', err);
+        }
+      }
+    };
+
+    // Registrar listeners siempre (el socket service maneja la conexión internamente)
+    console.log('🔧 Registrando listeners de socket para GroupDetailScreen');
+    socketService.on('user_joined_group', handleUserJoinedGroup);
+    socketService.on('user_left_group', handleUserLeftGroup);
+    socketService.on('group_error', handleGroupError);
+    socketService.on('series-added-to-group', handleSeriesAddedToGroup);
+    socketService.on('error', handleGenericError);
+    console.log('✅ Listeners registrados correctamente');
+
+    // Cleanup listeners
+    return () => {
+      socketService.off('user_joined_group', handleUserJoinedGroup);
+      socketService.off('user_left_group', handleUserLeftGroup);
+      socketService.off('group_error', handleGroupError);
+      socketService.off('series-added-to-group', handleSeriesAddedToGroup);
+      socketService.off('error', handleGenericError);
+    };
+  }, [socketConnected, success, error]);
+
   // Función para manejar configuración del grupo
   const handleSettings = () => {
     // TODO: Implementar configuración del grupo
@@ -164,9 +295,11 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGr
 
   // Función para manejar clic en serie
   const handleSeriesPress = (seriesItem) => {
-    if (onGroupSeriesDetail && typeof onGroupSeriesDetail === 'function') {
-      onGroupSeriesDetail('GroupSeriesDetail', { group: groupInfo, series: seriesItem, members });
-    }
+    navigation.navigate('GroupSeriesDetail', { 
+      group: groupInfo, 
+      series: seriesItem, 
+      members 
+    });
   };
 
   // Función para manejar clic en miembro
@@ -177,15 +310,12 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGr
 
   // Función para añadir serie al grupo
   const handleAddSeries = () => {
-    // Navegar a la pantalla de añadir series
-    if (onAddSeries && typeof onAddSeries === 'function') {
-      onAddSeries('AddSeries', { group: groupInfo });
-    }
+    navigation.navigate('AddSeries', { group: groupInfo });
   };
 
   // Función para añadir miembro al grupo
   const handleAddMember = () => {
-    // TODO: Implementar añadir miembro
+    // TODO: Implementar añadir miembro al grupo
     Alert.alert(t('addMember'), t('addMemberComingSoon'));
   };
 
@@ -424,11 +554,6 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGr
                 <Text style={createComponentStyles(isDarkMode).listItemSubtitle}>
                   {seriesItem.episodes_count || 0} {t('episodes')} • {seriesItem.status || t('unknown')}
                 </Text>
-                {seriesItem.last_episode && (
-                  <Text style={createComponentStyles(isDarkMode).listItemSubtitle}>
-                    {t('lastEpisode')}: {seriesItem.last_episode}
-                  </Text>
-                )}
               </View>
               <Ionicons 
                 name="chevron-forward" 
@@ -581,57 +706,8 @@ const GroupDetailScreen = ({ route, navigation, onBack, group, onAddSeries, onGr
       createComponentStyles(isDarkMode).container,
       { backgroundColor: isDarkMode ? colors.dark.background : colors.light.background }
     ]}>
-      {/* Header personalizado para navegación personalizada */}
-      {onBack && (
-        <View style={[createComponentStyles(isDarkMode).header, { 
-          backgroundColor: isDarkMode ? colors.dark.background : colors.light.background,
-          borderBottomWidth: 1,
-          borderBottomColor: isDarkMode ? colors.dark.border : colors.light.border,
-        }]}>
-          <TouchableOpacity 
-            onPress={onBack}
-            style={{ 
-              width: 40, 
-              height: 40, 
-              borderRadius: 20, 
-              backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-              justifyContent: 'center', 
-              alignItems: 'center' 
-            }}
-          >
-            <Ionicons 
-              name="arrow-back" 
-              size={24} 
-              color={isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary} 
-            />
-          </TouchableOpacity>
-          <Text style={[createComponentStyles(isDarkMode).headerTitle, { 
-            color: isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary 
-          }]}>
-            {groupInfo?.name || t('group')}
-          </Text>
-          <TouchableOpacity 
-            onPress={handleSettings}
-            style={{ 
-              width: 40, 
-              height: 40, 
-              borderRadius: 20, 
-              backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-              justifyContent: 'center', 
-              alignItems: 'center' 
-            }}
-          >
-            <Ionicons 
-              name="settings-outline" 
-              size={24} 
-              color={isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary} 
-            />
-          </TouchableOpacity>
-        </View>
-      )}
-      
       <ScrollView
-        style={[createComponentStyles(isDarkMode).scrollView, onBack && { marginTop: 0 }]}
+        style={[createComponentStyles(isDarkMode).scrollView]}
         contentContainerStyle={[createComponentStyles(isDarkMode).scrollContent, { paddingBottom: 100 }]}
         refreshControl={
           <RefreshControl

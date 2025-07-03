@@ -17,9 +17,11 @@ import { useToast } from '../contexts/ToastContext';
 import { colors } from '../styles/colors';
 import { createComponentStyles } from '../styles/components';
 import apiService from '../services/api.service';
+import socketService from '../services/socket.service';
 
-const AddSeriesScreen = ({ navigation, onBack, group }) => {
-  // Obtener el groupId solo desde la prop group
+const AddSeriesScreen = ({ navigation, route }) => {
+  // Obtener el groupId desde route.params
+  const group = route?.params?.group;
   const groupIdFinal = group?.id;
 
   console.log('Group ID usado en AddSeriesScreen:', groupIdFinal);
@@ -27,7 +29,7 @@ const AddSeriesScreen = ({ navigation, onBack, group }) => {
   const { isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { getAuthHeaders } = useAuth();
-  const { showSuccess, showError } = useToast();
+  const { success, error } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -57,12 +59,12 @@ const AddSeriesScreen = ({ navigation, onBack, group }) => {
       }
     } catch (error) {
       console.error('💥 Error searching series:', error);
-      showError('Error', t('searchError'));
+      error(t('searchError'));
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
-  }, [showError, t]);
+  }, [error, t]);
 
   // Debounce para evitar demasiadas llamadas a la API
   const [searchTimeout, setSearchTimeout] = useState(null);
@@ -101,16 +103,16 @@ const AddSeriesScreen = ({ navigation, onBack, group }) => {
 
   // Función para añadir serie al grupo
   const addSeriesToGroup = useCallback(async (series) => {
-
     if (!groupIdFinal) {
       console.log('🔍 Group ID from params:', groupIdFinal);
-      showError('Error', t('groupIdRequired'));
+      error(t('groupIdRequired'));
       return;
     }
+
     try {
       setIsAddingSeries(true);
-      const headers = getAuthHeaders();
-      console.log('🔍 Headers:', headers);
+      
+      // Preparar datos de la serie
       const seriesData = {
         tmdb_id: series.id,
         name: series.name,
@@ -121,23 +123,69 @@ const AddSeriesScreen = ({ navigation, onBack, group }) => {
         vote_count: series.vote_count,
         popularity: series.popularity,
       };
-      console.log('🔍 Series data:', seriesData);
-      const response = await apiService.addSeriesToGroup(groupIdFinal, seriesData, headers);
-      if (response.success) {
-        showSuccess(t('seriesAdded'), t('seriesAddedSuccess'));
-        if (onBack) {
-          onBack();
-        }
-      } else {
-        showError('Error', response.message || t('addSeriesError'));
+      
+      console.log('📺 Enviando serie por socket:', seriesData);
+      
+      // Verificar si el socket está conectado
+      if (!socketService.getConnectionStatus()) {
+        console.log('❌ Socket no conectado, intentando conectar...');
+        const headers = getAuthHeaders();
+        await socketService.connect(groupIdFinal.toString(), headers['Authorization']);
       }
+      
+      // Enviar por socket
+      socketService.addSeriesToGroup(groupIdFinal, seriesData);
+      
+      // El resultado se manejará en los listeners de socket
+      
     } catch (error) {
       console.error('💥 Error adding series:', error);
-      showError('Error', t('addSeriesError'));
-    } finally {
+      error('Error', t('addSeriesError'));
       setIsAddingSeries(false);
     }
-  }, [groupIdFinal, getAuthHeaders, showSuccess, showError, t, onBack]);
+  }, [groupIdFinal, getAuthHeaders, error, t]);
+
+  // Configurar listeners de socket para añadir series
+  useEffect(() => {
+    const handleSeriesAdded = (data) => {
+      console.log('📺 Evento series-added-to-group recibido:', data);
+      setIsAddingSeries(false);
+      if (data && data.success) {
+        console.log('✅ Serie añadida exitosamente, navegando de vuelta');
+        success(t('seriesAdded'), data.message || t('seriesAddedSuccess'));
+        
+        // Navegar de vuelta - el socket actualizará la lista en GroupDetailScreen
+        navigation.goBack();
+      } else if (data && data.message) {
+        console.log('❌ Error en la respuesta:', data.message);
+        error('Error', data.message);
+      }
+    };
+
+    const handleSeriesError = (errorData) => {
+      setIsAddingSeries(false);
+      error('Error', errorData.message || t('addSeriesError'));
+    };
+
+    const handleGenericError = (errorData) => {
+      console.log('❌ Error genérico recibido:', errorData);
+      setIsAddingSeries(false);
+      error('Error', errorData.message || t('addSeriesError'));
+    };
+
+    console.log('🔧 Registrando listeners de socket para AddSeriesScreen');
+    socketService.on('series-added-to-group', handleSeriesAdded);
+    socketService.on('series-added-error', handleSeriesError);
+    socketService.on('error', handleGenericError);
+    console.log('✅ Listeners registrados correctamente');
+
+    return () => {
+      socketService.off('series-added-to-group', handleSeriesAdded);
+      socketService.off('series-added-error', handleSeriesError);
+      socketService.off('error', handleGenericError);
+      setIsAddingSeries(false);
+    };
+  }, [success, error, t, navigation]);
 
   // Función para manejar búsqueda manual (botón)
   const handleSearch = () => {
@@ -237,36 +285,7 @@ const AddSeriesScreen = ({ navigation, onBack, group }) => {
       createComponentStyles(isDarkMode).container,
       { backgroundColor: isDarkMode ? colors.dark.background : colors.light.background }
     ]}>
-      {/* Header personalizado */}
-      <View style={[createComponentStyles(isDarkMode).header, { 
-        backgroundColor: isDarkMode ? colors.dark.background : colors.light.background,
-        borderBottomWidth: 1,
-        borderBottomColor: isDarkMode ? colors.dark.border : colors.light.border,
-      }]}>
-        <TouchableOpacity 
-          onPress={onBack || (navigation && navigation.goBack)}
-          style={{ 
-            width: 40, 
-            height: 40, 
-            borderRadius: 20, 
-            backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-            justifyContent: 'center', 
-            alignItems: 'center' 
-          }}
-        >
-          <Ionicons 
-            name="arrow-back" 
-            size={24} 
-            color={isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary} 
-          />
-        </TouchableOpacity>
-        <Text style={[createComponentStyles(isDarkMode).headerTitle, { 
-          color: isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary 
-        }]}>
-          {t('addSeries')}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      
 
       <ScrollView
         style={createComponentStyles(isDarkMode).scrollView}

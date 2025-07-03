@@ -19,7 +19,7 @@ import { colors } from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-const SettingsScreen = ({ onBack }) => {
+const SettingsScreen = ({ navigation }) => {
   const { isDarkMode, themeMode, setThemeMode } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
   const { user, logout } = useAuth();
@@ -108,17 +108,6 @@ const SettingsScreen = ({ onBack }) => {
     <View style={styles.container}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.headerButton}>
-          <Ionicons name="arrow-back" size={20} color={isDarkMode ? colors.dark.text : colors.light.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('settings')}</Text>
-        <TouchableOpacity onPress={handleSave} style={[styles.headerButton, { backgroundColor: colors.primary[500] }]}>
-          <Ionicons name="checkmark" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView 
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}

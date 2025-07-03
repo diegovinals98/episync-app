@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import apiService from '../services/api.service';
 import socketService from '../services/socket.service';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,7 +11,8 @@ import { createComponentStyles } from '../styles/components';
 import { colors } from '../styles/colors';
 import Skeleton from '../components/Skeleton';
 
-const GroupSeriesDetailScreen = ({ onBack, group, series, members, onSeasonEpisodes }) => {
+const GroupSeriesDetailScreen = ({ navigation, route }) => {
+  const { group, series, members } = route?.params || {};
   const { isDarkMode } = useTheme();
   const { user, accessToken } = useAuth();
   const { success, error } = useToast();
@@ -22,54 +24,100 @@ const GroupSeriesDetailScreen = ({ onBack, group, series, members, onSeasonEpiso
   const [membersProgress, setMembersProgress] = useState([]);
   const [loadingProgress, setLoadingProgress] = useState(true);
 
-  // Obtener progreso real de los miembros
-  useEffect(() => {
-    const fetchMembersProgress = async () => {
-      if (!group?.id || !series?.id) {
-        setLoadingProgress(false);
-        return;
-      }
+  // Obtener progreso real de los miembros (solo la primera vez)
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchMembersProgress = async () => {
+        if (!group?.id || !series?.id) {
+          setLoadingProgress(false);
+          return;
+        }
 
-      try {
-        setLoadingProgress(true);
-        console.log('📊 Obteniendo progreso real de miembros...');
-        console.log('🔍 token:', accessToken);
+        // Solo cargar si no hay datos de progreso ya cargados
+        if (membersProgress.length > 0) {
+          console.log('📊 Progreso ya cargado, saltando llamada a API');
+          setLoadingProgress(false);
+          return;
+        }
+
+        try {
+          setLoadingProgress(true);
+          console.log('📊 Obteniendo progreso inicial de miembros...');
+          console.log('🔍 token:', accessToken);
+          
+          const response = await apiService.getSeriesProgress(
+            group.id, 
+            series.id, 
+            { 'Authorization': `Bearer ${accessToken}` }
+          );
+          
+          console.log('📊 Respuesta de progreso:', response);
+          
+          // La respuesta tiene estructura anidada: response.data.data.members_progress
+          let membersProgressData;
+          if (response.data && response.data.data && response.data.data.members_progress) {
+            membersProgressData = response.data.data.members_progress;
+          } else if (response.data && response.data.members_progress) {
+            membersProgressData = response.data.members_progress;
+          } else if (response.normalizedData && response.normalizedData.members_progress) {
+            membersProgressData = response.normalizedData.members_progress;
+          }
+          
+          if (membersProgressData && membersProgressData.length > 0) {
+            console.log('✅ Datos de progreso inicial obtenidos:', membersProgressData);
+            setMembersProgress(membersProgressData);
+          } else {
+            console.log('⚠️ No hay datos de progreso disponibles');
+            setMembersProgress([]);
+          }
+        } catch (error) {
+          console.error('❌ Error obteniendo progreso:', error);
+          setMembersProgress([]);
+        } finally {
+          setLoadingProgress(false);
+        }
+      };
+
+      fetchMembersProgress();
+    }, [group?.id, series?.id, accessToken, membersProgress.length])
+  );
+
+  // Configurar listeners de socket para actualización en tiempo real
+  useEffect(() => {
+    const handleSeriesProgressUpdated = (data) => {
+      console.log('📊 Progreso de serie actualizado en tiempo real:', data);
+      
+      // Verificar que los datos correspondan a la serie actual
+      if (data.groupId === group?.id && data.seriesId === series?.id) {
+        console.log('✅ Actualizando progreso para la serie actual');
         
-        const response = await apiService.getSeriesProgress(
-          group.id, 
-          series.id, 
-          { 'Authorization': `Bearer ${accessToken}` }
-        );
-        
-        console.log('📊 Respuesta de progreso:', response);
-        
-        // La respuesta tiene estructura anidada: response.data.data.members_progress
+        // Extraer los datos de progreso de los miembros
         let membersProgressData;
-        if (response.data && response.data.data && response.data.data.members_progress) {
-          membersProgressData = response.data.data.members_progress;
-        } else if (response.data && response.data.members_progress) {
-          membersProgressData = response.data.members_progress;
-        } else if (response.normalizedData && response.normalizedData.members_progress) {
-          membersProgressData = response.normalizedData.members_progress;
+        if (data.data && data.data.members_progress) {
+          membersProgressData = data.data.members_progress;
+        } else if (data.members_progress) {
+          membersProgressData = data.members_progress;
         }
         
         if (membersProgressData && membersProgressData.length > 0) {
-          console.log('✅ Datos de progreso obtenidos:', membersProgressData);
+          console.log('✅ Actualizando progreso de miembros:', membersProgressData);
           setMembersProgress(membersProgressData);
         } else {
-          console.log('⚠️ No hay datos de progreso disponibles');
-          setMembersProgress([]);
+          console.log('⚠️ No hay datos de progreso en la actualización');
         }
-      } catch (error) {
-        console.error('❌ Error obteniendo progreso:', error);
-        setMembersProgress([]);
-      } finally {
-        setLoadingProgress(false);
+      } else {
+        console.log('ℹ️ Actualización de progreso para otra serie/grupo, ignorando');
       }
     };
 
-    fetchMembersProgress();
-  }, [group?.id, series?.id, accessToken]);
+    // Registrar listener
+    socketService.on('series-progress-updated', handleSeriesProgressUpdated);
+
+    // Cleanup listener
+    return () => {
+      socketService.off('series-progress-updated', handleSeriesProgressUpdated);
+    };
+  }, [group?.id, series?.id]);
 
   // Ordenar miembros por progreso (más avanzado primero)
   const sortedMembers = [...membersProgress].sort((a, b) => {
@@ -144,36 +192,19 @@ const GroupSeriesDetailScreen = ({ onBack, group, series, members, onSeasonEpiso
   }, [seriesDetails, loading, group?.id, series?.tmdb_id, accessToken, roomId]);
 
   const handleSeasonPress = (season) => {
-    if (onSeasonEpisodes && typeof onSeasonEpisodes === 'function') {
-      onSeasonEpisodes('SeasonEpisodes', { group, series, season, members });
-    }
+    navigation.navigate('SeasonEpisodes', { group, series, season, members });
   };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      socketService.leaveRoom();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   return (
     <View style={[styles.container, { backgroundColor: isDarkMode ? colors.dark.background : colors.light.background }]}> 
-      {/* Header */}
-      <View style={[styles.header, { borderBottomWidth: 1, borderBottomColor: isDarkMode ? colors.dark.border : colors.light.border }]}> 
-        <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary, justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="arrow-back" size={24} color={isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary }]}> 
-          {series?.name || 'Serie'}
-        </Text>
-        <View style={{ 
-          width: 40, 
-          height: 40, 
-          borderRadius: 20, 
-          backgroundColor: socketConnected ? colors.success[500] : colors.error[500],
-          justifyContent: 'center', 
-          alignItems: 'center' 
-        }}>
-          <Ionicons 
-            name={socketConnected ? "wifi" : "wifi-outline"} 
-            size={20} 
-            color="white" 
-          />
-        </View>
-      </View>
+      {/* Eliminar el header personalizado - usar header nativo de React Navigation */}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 16 }]}>
         {/* Info de la serie */}

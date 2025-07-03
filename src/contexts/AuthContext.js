@@ -215,8 +215,21 @@ export const AuthProvider = ({ children }) => {
       // Conectar con la API real
       const response = await apiService.post(ENDPOINTS.auth.login, { email, password });
       
+      console.log('🔍 Login response:', response);
+      console.log('🔍 Response status:', response.status);
+      console.log('🔍 Response success:', response.success);
+      
       if (!response.success) {
-        throw new Error(response.message || 'Error en el login');
+        // Manejar específicamente el error 401 (credenciales incorrectas)
+        if (response.status === 401) {
+          console.log('🚨 Error 401 detectado - mostrando toast de credenciales incorrectas');
+          error('Error de Login', 'Email o contraseña incorrectos');
+          return { success: false, error: 'Email o contraseña incorrectos' };
+        }
+        
+        console.log('🚨 Error no 401:', response.status, response.message);
+        error('Error de Login', response.message || 'Error en el login');
+        return { success: false, error: response.message || 'Error en el login' };
       }
 
       console.log('login response', response);
@@ -251,7 +264,12 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
-      error('Error de conexión', 'No se pudo conectar al servidor');
+      
+      // Solo mostrar toast si es un error de red (los otros errores ya se manejan arriba)
+      if (error.message.includes('Network') || error.message.includes('fetch')) {
+        error('Error de conexión', 'No se pudo conectar al servidor. Verifica tu conexión a internet.');
+      }
+      
       return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
@@ -316,7 +334,8 @@ export const AuthProvider = ({ children }) => {
       const response = await apiService.post(ENDPOINTS.auth.google, { code });
       
       if (!response.success) {
-        throw new Error(response.message || 'Error en la autenticación con Google');
+        error('Error de Google', response.message || 'Error en la autenticación con Google');
+        return { success: false, error: response.message || 'Error en la autenticación con Google' };
       }
 
       const { accessToken: access, refreshToken: refresh, user: userData } = response.data;
@@ -342,6 +361,12 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       console.error('Google auth error:', error);
+      
+      // Solo mostrar toast si es un error de red
+      if (error.message.includes('Network') || error.message.includes('fetch')) {
+        error('Error de conexión', 'No se pudo conectar al servidor. Verifica tu conexión a internet.');
+      }
+      
       return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
