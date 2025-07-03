@@ -126,11 +126,15 @@ const AddSeriesScreen = ({ navigation, route }) => {
       
       console.log('📺 Enviando serie por socket:', seriesData);
       
-      // Verificar si el socket está conectado
+      // Verificar si el socket está conectado y cambiar al room del grupo si es necesario
       if (!socketService.getConnectionStatus()) {
         console.log('❌ Socket no conectado, intentando conectar...');
         const headers = getAuthHeaders();
         await socketService.connect(groupIdFinal.toString(), headers['Authorization']);
+      } else {
+        // Si ya está conectado, cambiar al room del grupo
+        console.log('🔄 Socket ya conectado, cambiando al room del grupo...');
+        socketService.changeRoom(groupIdFinal.toString());
       }
       
       // Enviar por socket

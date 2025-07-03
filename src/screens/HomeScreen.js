@@ -65,7 +65,13 @@ const HomeScreen = () => {
   useEffect(() => {
     if (user && user.id) {
       const headers = getAuthHeaders();
-      socketService.connect('user_' + user.id, headers['Authorization']);
+      // Verificar si el socket está conectado y cambiar al room de usuario si es necesario
+      if (!socketService.getConnectionStatus()) {
+        socketService.connect('user_' + user.id, headers['Authorization']);
+      } else {
+        // Si ya está conectado, cambiar al room de usuario
+        socketService.changeRoom('user_' + user.id);
+      }
     }
   }, [user]);
 

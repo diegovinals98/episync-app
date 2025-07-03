@@ -7,6 +7,8 @@ class SocketService {
     this.currentRoom = null;
     this.isConnected = false;
     this.eventListeners = new Map();
+    this.connectionPromise = null;
+    this.currentToken = null;
   }
 
   /**
@@ -20,126 +22,153 @@ class SocketService {
       try {
         console.log('🔌 Iniciando conexión Socket.IO...');
         console.log('📍 URL del servidor:', ENV.SOCKET_URL || 'http://localhost:4000');
-        console.log('🚪 Room ID:', roomId);
+        console.log('🚪 Room ID solicitado:', roomId);
+        console.log('🔑 Token proporcionado:', token ? 'Sí' : 'No');
         
-        // Desconectar si ya hay una conexión activa
-        if (this.socket) {
-          console.log('🔄 Desconectando socket anterior...');
+        // Si ya hay una conexión activa con el mismo token, solo cambiar de room
+        if (this.socket && this.isConnected && this.currentToken === token) {
+          console.log('🔄 Socket ya conectado con el mismo token, cambiando de room...');
+          this.changeRoom(roomId);
+          resolve();
+          return;
+        }
+
+        // Si hay una conexión activa pero con token diferente, desconectar primero
+        if (this.socket && this.currentToken !== token) {
+          console.log('🔄 Token diferente detectado, desconectando socket anterior...');
           this.disconnect();
         }
 
+        // Si ya hay una promesa de conexión en curso, esperar a que termine
+        if (this.connectionPromise) {
+          console.log('⏳ Esperando conexión anterior en curso...');
+          this.connectionPromise.then(() => {
+            this.changeRoom(roomId);
+            resolve();
+          }).catch(reject);
+          return;
+        }
+
         // Crear nueva conexión
-        this.socket = io(ENV.SOCKET_URL || 'http://localhost:4000', {
-          auth: {
-            token: token
-          },
-          transports: ['websocket', 'polling'],
-          reconnection: true,
-          reconnectionAttempts: 10,
-          reconnectionDelay: 2000
+        this.connectionPromise = new Promise((innerResolve, innerReject) => {
+          this.socket = io(ENV.SOCKET_URL || 'http://localhost:4000', {
+            auth: {
+              token: token
+            },
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000
+          });
+
+          // Eventos de conexión
+          this.socket.on('connect', () => {
+            console.log('✅ Socket conectado exitosamente!');
+            console.log('🆔 Socket ID:', this.socket.id);
+            this.isConnected = true;
+            this.currentToken = token;
+            
+            // Unirse al room solicitado
+            this.changeRoom(roomId);
+            innerResolve();
+          });
+
+          this.socket.on('connect_error', (error) => {
+            console.error('❌ Error de conexión Socket:', error);
+            console.error('🔍 Detalles del error:', error.message);
+            this.isConnected = false;
+            this.currentToken = null;
+            this.connectionPromise = null;
+            innerReject(error);
+          });
+
+          this.socket.on('disconnect', (reason) => {
+            console.log('🔌 Socket desconectado');
+            console.log('📝 Razón:', reason);
+            this.isConnected = false;
+            this.currentToken = null;
+            this.connectionPromise = null;
+          });
+
+          // Eventos específicos del room
+          this.socket.on('episode_watched', (data) => {
+            console.log('👁️ Episodio marcado como visto:', data);
+            this.emitEvent('episode_watched', data);
+          });
+
+          this.socket.on('episode_unwatched', (data) => {
+            console.log('👁️ Episodio marcado como no visto:', data);
+            this.emitEvent('episode_unwatched', data);
+          });
+
+          this.socket.on('series-progress-updated', (data) => {
+            console.log('📊 Progreso de serie actualizado:', data);
+            this.emitEvent('series-progress-updated', data);
+          });
+
+          this.socket.on('episode-toggled-confirmed', (data) => {
+            console.log('✅ Episodio toggle confirmado:', data);
+            this.emitEvent('episode-toggled-confirmed', data);
+          });
+
+          this.socket.onAny((event, data) => {
+            console.log('🔄 EVENTO RECIBIDO:', event);
+            console.log('📦 DATOS:', data);
+          });
+
+          this.socket.on('user_joined_room', (data) => {
+            console.log('👤 Usuario se unió al room:', data);
+            this.emitEvent('user_joined_room', data);
+          });
+
+          this.socket.on('user_left_room', (data) => {
+            console.log('👤 Usuario salió del room:', data);
+            this.emitEvent('user_left_room', data);
+          });
+
+          this.socket.on('room_error', (error) => {
+            console.error('❌ Error en room:', error);
+            this.emitEvent('room_error', error);
+          });
+
+          this.socket.on('user_joined_group', (data) => {
+            console.log('👤 Usuario se unió al grupo:', data);
+            this.emitEvent('user_joined_group', data);
+          });
+
+          this.socket.on('user_left_group', (data) => {
+            console.log('👤 Usuario salió del grupo:', data);
+            this.emitEvent('user_left_group', data);
+          });
+
+          this.socket.on('group_error', (error) => {
+            console.error('❌ Error en grupo:', error);
+            this.emitEvent('group_error', error);
+          });
+
+          this.socket.on('series-added-to-group', (data) => {
+            console.log('📺 Serie añadida al grupo:', data);
+            console.log('📊 Emitiendo evento series-added-to-group a los listeners');
+            this.emitEvent('series-added-to-group', data);
+          });
+
+          this.socket.on('series-added-error', (error) => {
+            console.error('❌ Error añadiendo serie al grupo:', error);
+            this.emitEvent('series-added-error', error);
+          });
+
+          this.socket.on('error', (error) => {
+            console.error('❌ Error genérico del socket:', error);
+            this.emitEvent('error', error);
+          });
         });
 
-        // Eventos de conexión
-        this.socket.on('connect', () => {
-          console.log('✅ Socket conectado exitosamente!');
-          console.log('🆔 Socket ID:', this.socket.id);
-          console.log('🚪 Uniéndose al room:', roomId);
-          this.isConnected = true;
-          
-          // Determinar el tipo de room y unirse apropiadamente
-          if (roomId && typeof roomId === 'string' && roomId.startsWith('user_')) {
-            this.joinUserRoom(roomId.replace('user_', ''));
-          } else if (roomId.includes('+')) {
-            this.joinRoom(roomId);
-          } else {
-            this.joinGroupRoom(roomId);
-          }
+        this.connectionPromise.then(() => {
+          this.connectionPromise = null;
           resolve();
-        });
-
-        this.socket.on('connect_error', (error) => {
-          console.error('❌ Error de conexión Socket:', error);
-          console.error('🔍 Detalles del error:', error.message);
-          this.isConnected = false;
+        }).catch((error) => {
+          this.connectionPromise = null;
           reject(error);
-        });
-
-        this.socket.on('disconnect', (reason) => {
-          console.log('🔌 Socket desconectado');
-          console.log('📝 Razón:', reason);
-          this.isConnected = false;
-        });
-
-        // Eventos específicos del room
-        this.socket.on('episode_watched', (data) => {
-          console.log('👁️ Episodio marcado como visto:', data);
-          this.emitEvent('episode_watched', data);
-        });
-
-        this.socket.on('episode_unwatched', (data) => {
-          console.log('👁️ Episodio marcado como no visto:', data);
-          this.emitEvent('episode_unwatched', data);
-        });
-
-        this.socket.on('series-progress-updated', (data) => {
-          console.log('📊 Progreso de serie actualizado:', data);
-          this.emitEvent('series-progress-updated', data);
-        });
-
-        this.socket.on('episode-toggled-confirmed', (data) => {
-          console.log('✅ Episodio toggle confirmado:', data);
-          this.emitEvent('episode-toggled-confirmed', data);
-        });
-
-        this.socket.onAny((event, data) => {
-          console.log('🔄 EVENTO RECIBIDO:', event);
-          console.log('📦 DATOS:', data);
-        });
-
-        this.socket.on('user_joined_room', (data) => {
-          console.log('👤 Usuario se unió al room:', data);
-          this.emitEvent('user_joined_room', data);
-        });
-
-        this.socket.on('user_left_room', (data) => {
-          console.log('👤 Usuario salió del room:', data);
-          this.emitEvent('user_left_room', data);
-        });
-
-        this.socket.on('room_error', (error) => {
-          console.error('❌ Error en room:', error);
-          this.emitEvent('room_error', error);
-        });
-
-        this.socket.on('user_joined_group', (data) => {
-          console.log('👤 Usuario se unió al grupo:', data);
-          this.emitEvent('user_joined_group', data);
-        });
-
-        this.socket.on('user_left_group', (data) => {
-          console.log('👤 Usuario salió del grupo:', data);
-          this.emitEvent('user_left_group', data);
-        });
-
-        this.socket.on('group_error', (error) => {
-          console.error('❌ Error en grupo:', error);
-          this.emitEvent('group_error', error);
-        });
-
-        this.socket.on('series-added-to-group', (data) => {
-          console.log('📺 Serie añadida al grupo:', data);
-          console.log('📊 Emitiendo evento series-added-to-group a los listeners');
-          this.emitEvent('series-added-to-group', data);
-        });
-
-        this.socket.on('series-added-error', (error) => {
-          console.error('❌ Error añadiendo serie al grupo:', error);
-          this.emitEvent('series-added-error', error);
-        });
-
-        this.socket.on('error', (error) => {
-          console.error('❌ Error genérico del socket:', error);
-          this.emitEvent('error', error);
         });
 
       } catch (error) {
@@ -147,6 +176,51 @@ class SocketService {
         reject(error);
       }
     });
+  }
+
+  /**
+   * Cambia de room sin desconectar el socket
+   * @param {string} roomId - ID del nuevo room
+   * @param {object} options - Opciones (skipLeave: true para no hacer leave del room anterior)
+   */
+  changeRoom(roomId, options = {}) {
+    if (!this.socket || !this.isConnected) {
+      console.error('❌ Socket no conectado');
+      return;
+    }
+
+    // Si ya estamos en el mismo room, no hacer nada
+    if (this.currentRoom === roomId) {
+      console.log('ℹ️ Ya estamos en el room:', roomId);
+      return;
+    }
+
+    // Salir del room actual si existe y no se pide skipLeave
+    if (this.currentRoom && !options.skipLeave) {
+      console.log('🚪 Saliendo del room actual:', this.currentRoom);
+      this.leaveRoom();
+    }
+
+    // Unirse al nuevo room
+    console.log('🚪 Cambiando al room:', roomId);
+    console.log('📊 Estado actual del socket:', {
+      connected: this.socket.connected,
+      id: this.socket.id,
+      newRoomId: roomId
+    });
+    
+    this.currentRoom = roomId;
+    
+    // Determinar el tipo de room y unirse apropiadamente
+    if (roomId && typeof roomId === 'string' && roomId.startsWith('user_')) {
+      this.joinUserRoom(roomId.replace('user_', ''));
+    } else if (roomId.includes('+')) {
+      this.joinRoom(roomId);
+    } else {
+      this.joinGroupRoom(roomId);
+    }
+    
+    console.log('✅ Cambio de room completado');
   }
 
   /**
@@ -393,6 +467,8 @@ class SocketService {
       this.socket = null;
       this.currentRoom = null;
       this.isConnected = false;
+      this.currentToken = null;
+      this.connectionPromise = null;
       this.eventListeners.clear();
       console.log('✅ Socket desconectado completamente');
     } else {

@@ -104,14 +104,7 @@ export const AuthProvider = ({ children }) => {
       console.log('Tokens cargados correctamente');
 
       // Conectar al socket después de cargar los tokens
-      try {
-        console.log('🔌 Conectando al socket (global) después de cargar tokens...');
-        await socketService.connect('global', storedAccessToken);
-        console.log('✅ Socket conectado exitosamente después de cargar tokens');
-      } catch (socketError) {
-        console.error('❌ Error conectando al socket después de cargar tokens:', socketError);
-        console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
-      }
+      await connectToSocket(storedAccessToken);
 
       // Verificar si el token sigue siendo válido
       try {
@@ -170,6 +163,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Función helper para conectar al socket de manera inteligente
+  const connectToSocket = async (token) => {
+    try {
+      console.log('🔌 Conectando al socket (global)...');
+      // Verificar si el socket está conectado y cambiar al room global si es necesario
+      if (!socketService.getConnectionStatus()) {
+        await connectToSocket(token);
+      } else {
+        // Si ya está conectado, cambiar al room global
+        socketService.changeRoom('global');
+      }
+      console.log('✅ Socket conectado exitosamente');
+    } catch (socketError) {
+      console.error('❌ Error conectando al socket:', socketError);
+      console.log('⚠️ La app continuará funcionando sin sincronización en tiempo real');
+    }
+  };
+
   // Login con email/password
   const loginWithEmail = async (email, password) => {
     try {
@@ -201,7 +212,7 @@ export const AuthProvider = ({ children }) => {
         // Conectar al socket después del login exitoso
         try {
           console.log('🔌 Conectando al socket (global) después del login...');
-          await socketService.connect('global', mockAccessToken);
+          await connectToSocket(mockAccessToken);
           console.log('✅ Socket conectado exitosamente después del login');
         } catch (socketError) {
           console.error('❌ Error conectando al socket después del login:', socketError);
@@ -253,7 +264,7 @@ export const AuthProvider = ({ children }) => {
       // Conectar al socket después del login exitoso
       try {
         console.log('🔌 Conectando al socket (global) después del login...');
-        await socketService.connect('global', accessToken);
+        await connectToSocket(accessToken);
         console.log('✅ Socket conectado exitosamente después del login');
       } catch (socketError) {
         console.error('❌ Error conectando al socket después del login:', socketError);
@@ -319,7 +330,7 @@ export const AuthProvider = ({ children }) => {
         // Conectar al socket después del login exitoso
         try {
           console.log('🔌 Conectando al socket (global) después del login...');
-          await socketService.connect('global', mockAccessToken);
+          await connectToSocket(mockAccessToken);
           console.log('✅ Socket conectado exitosamente después del login');
         } catch (socketError) {
           console.error('❌ Error conectando al socket después del login:', socketError);
@@ -350,7 +361,7 @@ export const AuthProvider = ({ children }) => {
       // Conectar al socket después del login exitoso
       try {
         console.log('🔌 Conectando al socket (global) después del login...');
-        await socketService.connect('global', access);
+        await connectToSocket(access);
         console.log('✅ Socket conectado exitosamente después del login');
       } catch (socketError) {
         console.error('❌ Error conectando al socket después del login:', socketError);
@@ -400,7 +411,7 @@ export const AuthProvider = ({ children }) => {
         // Conectar al socket después del login exitoso
         try {
           console.log('🔌 Conectando al socket (global) después del login...');
-          await socketService.connect('global', mockAccessToken);
+          await connectToSocket(mockAccessToken);
           console.log('✅ Socket conectado exitosamente después del login');
         } catch (socketError) {
           console.error('❌ Error conectando al socket después del login:', socketError);
@@ -452,7 +463,7 @@ export const AuthProvider = ({ children }) => {
         // Conectar al socket después del login exitoso
         try {
           console.log('🔌 Conectando al socket (global) después del login...');
-          await socketService.connect('global', mockAccessToken);
+          await connectToSocket(mockAccessToken);
           console.log('✅ Socket conectado exitosamente después del login');
         } catch (socketError) {
           console.error('❌ Error conectando al socket después del login:', socketError);
@@ -496,7 +507,7 @@ export const AuthProvider = ({ children }) => {
       // Conectar al socket después del login exitoso
       try {
         console.log('🔌 Conectando al socket (global) después del login...');
-        await socketService.connect('global', accessToken);
+        await connectToSocket(accessToken);
         console.log('✅ Socket conectado exitosamente después del login');
       } catch (socketError) {
         console.error('❌ Error conectando al socket después del login:', socketError);
@@ -579,7 +590,7 @@ export const AuthProvider = ({ children }) => {
       try {
         console.log('🔌 Reconectando socket (global) después de refrescar token...');
         await socketService.disconnect(); // Desconectar primero
-        await socketService.connect('global', accessToken);
+        await connectToSocket(accessToken);
         console.log('✅ Socket reconectado exitosamente después de refrescar token');
       } catch (socketError) {
         console.error('❌ Error reconectando socket después de refrescar token:', socketError);

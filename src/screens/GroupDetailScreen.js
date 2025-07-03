@@ -166,8 +166,16 @@ const GroupDetailScreen = ({ route, navigation }) => {
         // Generar room ID para el grupo (solo groupId)
         const groupRoomId = groupInfo.id.toString();
         
-        // Conectar al room del grupo
-        await socketService.connect(groupRoomId, getAuthHeaders()['Authorization']);
+        // Verificar si el socket está conectado y cambiar al room del grupo si es necesario
+        if (!socketService.getConnectionStatus()) {
+          console.log('❌ Socket no conectado, intentando conectar...');
+          await socketService.connect(groupRoomId, getAuthHeaders()['Authorization']);
+        } else {
+          // Si ya está conectado, cambiar al room del grupo sin leave
+          console.log('🔄 Socket ya conectado, cambiando al room del grupo...');
+          socketService.changeRoom(groupRoomId, { skipLeave: true });
+        }
+        
         setSocketConnected(true);
         console.log('✅ Conectado exitosamente al room del grupo');
       } catch (error) {
