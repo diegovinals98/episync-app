@@ -140,13 +140,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     }
   }, [groupInfo?.id, getAuthHeaders, error, t]);
 
-  // Función para refrescar datos
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchGroupData();
-    setRefreshing(false);
-  }, [fetchGroupData]);
-
+ 
   // Cargar datos al montar el componente
   useEffect(() => {
     fetchGroupData();
@@ -249,7 +243,15 @@ const GroupDetailScreen = ({ route, navigation }) => {
         if (isDuplicate) {
           return prevSeries;
         }
-        return [...prevSeries, { ...seriesData, poster_url, loadingDetails: true }];
+        return [
+          ...prevSeries,
+          {
+            ...seriesData,
+            poster_url,
+            loadingDetails: true,
+            number_of_episodes: seriesData.number_of_episodes || 0,
+          }
+        ];
       });
       setGroupInfo(prevGroupInfo => ({
         ...prevGroupInfo,
@@ -709,28 +711,33 @@ const GroupDetailScreen = ({ route, navigation }) => {
     );
   };
 
+  
+
   return (
     <View style={[
       createComponentStyles(isDarkMode).container,
       { backgroundColor: isDarkMode ? colors.dark.background : colors.light.background }
     ]}>
-      <ScrollView
-        style={[createComponentStyles(isDarkMode).scrollView]}
-        contentContainerStyle={[createComponentStyles(isDarkMode).scrollContent, { paddingBottom: 100 }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[colors.primary[500]]}
-            tintColor={colors.primary[500]}
-          />
-        }
-      >
+      {/* Header fijo con información del grupo */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
         {renderGroupInfo()}
+      </View>
+
+      {/* Pestañas fijas */}
+      <View style={{ paddingHorizontal: 20, paddingBottom: 16 }}>
         {renderTabs()}
-        
-        {activeTab === 'series' ? renderSeriesList() : renderMembersList()}
-      </ScrollView>
+      </View>
+
+      {/* Contenido scrollable solo para series/miembros */}
+      <View style={{ flex: 1, paddingHorizontal: 20 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {activeTab === 'series' ? renderSeriesList() : renderMembersList()}
+        </ScrollView>
+      </View>
 
       {/* Botón flotante */}
       <View style={{

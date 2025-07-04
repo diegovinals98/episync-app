@@ -8,7 +8,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // URLs de la API
 const API_CONFIG = {
   development: {
-    baseUrl: 'http://localhost:4000',
+    baseUrl: 'https://episync.bodasofiaydiego.es',
     timeout: 10000, // 10 segundos
   },
   production: {

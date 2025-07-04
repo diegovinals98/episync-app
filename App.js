@@ -17,6 +17,7 @@ import CustomToast from './src/components/CustomToast';
 import Loader from './src/components/Loader';
 import GroupSeriesDetailScreen from './src/screens/GroupSeriesDetailScreen';
 import SeasonEpisodesScreen from './src/screens/SeasonEpisodesScreen';
+import CommentsScreen from './src/screens/CommentsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -114,6 +115,13 @@ const MainStack = () => (
       component={SeasonEpisodesScreen}
       options={({ route }) => ({ 
         title: route.params?.season?.name || 'Episodios'
+      })}
+    />
+    <Stack.Screen 
+      name="Comments" 
+      component={CommentsScreen}
+      options={({ route }) => ({ 
+        title: route.params?.group?.name || 'Comentarios'
       })}
     />
   </Stack.Navigator>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import apiService from '../services/api.service';
@@ -7,6 +7,7 @@ import socketService from '../services/socket.service';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { createComponentStyles } from '../styles/components';
 import { colors } from '../styles/colors';
 import Skeleton from '../components/Skeleton';
@@ -15,7 +16,8 @@ const GroupSeriesDetailScreen = ({ navigation, route }) => {
   const { group, series, members } = route?.params || {};
   const { isDarkMode } = useTheme();
   const { user, accessToken } = useAuth();
-  const { success, error } = useToast();
+  const { success, error, info } = useToast();
+  const { t } = useLanguage();
   const styles = createComponentStyles(isDarkMode);
 
   const [seriesDetails, setSeriesDetails] = useState(null);
@@ -23,6 +25,49 @@ const GroupSeriesDetailScreen = ({ navigation, route }) => {
   const [socketConnected, setSocketConnected] = useState(false);
   const [membersProgress, setMembersProgress] = useState([]);
   const [loadingProgress, setLoadingProgress] = useState(true);
+
+  // Configurar el header de navegación con botón de eliminar
+  useEffect(() => {
+    if (navigation) {
+      navigation.setOptions({
+        title: series?.name || t('series'),
+        headerRight: () => (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity 
+              onPress={handleComments}
+              style={{ marginRight: 16 }}
+            >
+              <Ionicons 
+                name="chatbubble-outline" 
+                size={24} 
+                color={isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={handleDeleteSeries}
+              style={{ marginRight: 16 }}
+            >
+              <Ionicons 
+                name="trash-outline" 
+                size={24} 
+                color={colors.error[500]} 
+              />
+            </TouchableOpacity>
+          </View>
+        ),
+      });
+    }
+  }, [navigation, series, isDarkMode, t]);
+
+  // Función para manejar la eliminación de la serie
+  const handleDeleteSeries = () => {
+    info('En desarrollo', t('deleteSeriesInProgress'));
+  };
+
+  // Función para manejar los comentarios
+  const handleComments = () => {
+    navigation.navigate('Comments', { group, series });
+  };
 
   // Obtener progreso real de los miembros (solo la primera vez)
   useFocusEffect(
@@ -204,31 +249,30 @@ const GroupSeriesDetailScreen = ({ navigation, route }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: isDarkMode ? colors.dark.background : colors.light.background }]}> 
-      {/* Eliminar el header personalizado - usar header nativo de React Navigation */}
+      {/* Info de la serie fija arriba */}
+      {seriesDetails ? (
+        <View style={[styles.card, { marginBottom: 20, alignItems: 'center' }]}> 
+          {seriesDetails.poster_path && (
+            <Image
+              source={{ uri: `https://image.tmdb.org/t/p/w300${seriesDetails.poster_path}` }}
+              style={{ width: 120, height: 180, borderRadius: 12, marginBottom: 12 }}
+              resizeMode="cover"
+            />
+          )}
+          <Text style={[styles.cardTitle, { fontSize: 20, marginBottom: 8, textAlign: 'center' }]}>{seriesDetails.name}</Text>
+          <Text style={[styles.textSecondary, { textAlign: 'center' }]} numberOfLines={4}>{seriesDetails.overview}</Text>
+        </View>
+      ) : (
+        <View style={[styles.card, { marginBottom: 20, alignItems: 'center' }]}> 
+          <Skeleton width={120} height={180} borderRadius={12} style={{ marginBottom: 12 }} />
+          <Skeleton width={150} height={20} borderRadius={8} style={{ marginBottom: 8 }} />
+          <Skeleton width={220} height={14} borderRadius={8} style={{ marginBottom: 4 }} />
+          <Skeleton width={180} height={14} borderRadius={8} />
+        </View>
+      )}
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 16 }]}>
-        {/* Info de la serie */}
-        {seriesDetails ? (
-          <View style={[styles.card, { marginBottom: 20, alignItems: 'center' }]}> 
-            {seriesDetails.poster_path && (
-              <Image
-                source={{ uri: `https://image.tmdb.org/t/p/w300${seriesDetails.poster_path}` }}
-                style={{ width: 120, height: 180, borderRadius: 12, marginBottom: 12 }}
-                resizeMode="cover"
-              />
-            )}
-            <Text style={[styles.cardTitle, { fontSize: 20, marginBottom: 8, textAlign: 'center' }]}>{seriesDetails.name}</Text>
-            <Text style={[styles.textSecondary, { textAlign: 'center' }]} numberOfLines={4}>{seriesDetails.overview}</Text>
-          </View>
-        ) : (
-          <View style={[styles.card, { marginBottom: 20, alignItems: 'center' }]}> 
-            <Skeleton width={120} height={180} borderRadius={12} style={{ marginBottom: 12 }} />
-            <Skeleton width={150} height={20} borderRadius={8} style={{ marginBottom: 8 }} />
-            <Skeleton width={220} height={14} borderRadius={8} style={{ marginBottom: 4 }} />
-            <Skeleton width={180} height={14} borderRadius={8} />
-          </View>
-        )}
-
+      {/* Scroll solo para progreso y temporadas */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 16 }]}> 
         {/* Miembros y progreso */}
         <View style={[styles.card, { marginBottom: 20 }]}> 
           <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Progreso de miembros</Text>
@@ -270,35 +314,32 @@ const GroupSeriesDetailScreen = ({ navigation, route }) => {
               </View>
             ))
           ) : (
-            <Text style={[styles.textSecondary, { textAlign: 'center', fontStyle: 'italic' }]}>
-              No hay progreso registrado aún
-            </Text>
+            <Text style={[styles.textSecondary, { textAlign: 'center', fontStyle: 'italic' }]}>No hay progreso registrado aún</Text>
           )}
         </View>
 
-        {/* Temporadas */}
+        {/* Temporadas en grid de 2 columnas */}
         <View style={[styles.card, { marginBottom: 20 }]}> 
           <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Temporadas</Text>
           {loading ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {[1,2,3,4,5].map((_, idx) => (
-                <View key={idx} style={{ marginRight: 15, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {[1,2,3,4].map((_, idx) => (
+                <View key={idx} style={{ width: '48%', marginBottom: 16, alignItems: 'center' }}>
                   <Skeleton width={120} height={180} borderRadius={12} style={{ marginBottom: 8 }} />
                   <Skeleton width={80} height={16} borderRadius={8} />
                 </View>
               ))}
-            </ScrollView>
+            </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {seriesDetails?.seasons?.map(season => (
+            <FlatList
+              data={(seriesDetails?.seasons || []).filter(season => season.name !== 'Specials')}
+              keyExtractor={item => item.season_number.toString()}
+              numColumns={2}
+              columnWrapperStyle={{ justifyContent: 'space-between' }}
+              renderItem={({ item: season }) => (
                 <TouchableOpacity
-                  key={season.season_number}
                   onPress={() => handleSeasonPress(season)}
-                  style={{
-                    marginRight: 15,
-                    alignItems: 'center',
-                    width: 120,
-                  }}
+                  style={{ width: '48%', marginBottom: 16, alignItems: 'center' }}
                 >
                   <View style={{
                     width: 120,
@@ -345,8 +386,10 @@ const GroupSeriesDetailScreen = ({ navigation, route }) => {
                     {season.episode_count} episodios
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              )}
+              ListEmptyComponent={<Text style={[styles.textSecondary, { textAlign: 'center', fontStyle: 'italic' }]}>No hay temporadas</Text>}
+              scrollEnabled={false}
+            />
           )}
         </View>
       </ScrollView>

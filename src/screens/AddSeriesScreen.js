@@ -104,46 +104,50 @@ const AddSeriesScreen = ({ navigation, route }) => {
   // Función para añadir serie al grupo
   const addSeriesToGroup = useCallback(async (series) => {
     if (!groupIdFinal) {
-      console.log('🔍 Group ID from params:', groupIdFinal);
       error(t('groupIdRequired'));
       return;
     }
 
     try {
       setIsAddingSeries(true);
-      
-      // Preparar datos de la serie
+
+      // 1. Obtener detalles completos de TMDB
+      const tmdbId = series.id;
+      const tmdbToken = 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1YmRhYzE1NTQ1ZjUzNzM2ZDUyZTk3MTE1NDI0NTExNSIsIm5iZiI6MTc1MTM3ODA3Ny40ODMsInN1YiI6IjY4NjNlODlkZDljYTA2ZmNlZmY4M2VkMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.9nsGIEk6ApFEVetd-9yIfFes8bclTPu-jsgdqc7G9mk'; // Sustituye por variable si lo necesitas
+      const tmdbResponse = await fetch(
+        `https://api.themoviedb.org/3/tv/${tmdbId}?language=en-US`,
+        {
+          headers: {
+            'Authorization': tmdbToken,
+            'accept': 'application/json'
+          }
+        }
+      );
+      const tmdbData = await tmdbResponse.json();
+
+      // 2. Construir el objeto completo
       const seriesData = {
-        tmdb_id: series.id,
-        name: series.name,
-        poster_url: series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null,
-        overview: series.overview,
-        first_air_date: series.first_air_date,
-        vote_average: series.vote_average,
-        vote_count: series.vote_count,
-        popularity: series.popularity,
+        tmdb_id: tmdbData.id,
+        name: tmdbData.name,
+        overview: tmdbData.overview,
+        poster_path: tmdbData.poster_path || null,
+        backdrop_path: tmdbData.backdrop_path || null,
+        first_air_date: tmdbData.first_air_date || null,
+        number_of_seasons: tmdbData.number_of_seasons || (tmdbData.seasons ? tmdbData.seasons.length : null),
+        number_of_episodes: tmdbData.number_of_episodes || null,
+        genres: tmdbData.genres ? JSON.stringify(tmdbData.genres) : null,
+        vote_average: tmdbData.vote_average || 0.0,
+        vote_count: tmdbData.vote_count || 0,
+        is_popular: 0,
+        created_at: null,
+        updated_at: null,
+        popularity: tmdbData.popularity || 0.0,
       };
-      
-      console.log('📺 Enviando serie por socket:', seriesData);
-      
-      // Verificar si el socket está conectado y cambiar al room del grupo si es necesario
-      if (!socketService.getConnectionStatus()) {
-        console.log('❌ Socket no conectado, intentando conectar...');
-        const headers = getAuthHeaders();
-        await socketService.connect(groupIdFinal.toString(), headers['Authorization']);
-      } else {
-        // Si ya está conectado, cambiar al room del grupo
-        console.log('🔄 Socket ya conectado, cambiando al room del grupo...');
-        socketService.changeRoom(groupIdFinal.toString());
-      }
-      
-      // Enviar por socket
+
+      // 3. Enviar por socket
       socketService.addSeriesToGroup(groupIdFinal, seriesData);
-      
-      // El resultado se manejará en los listeners de socket
-      
-    } catch (error) {
-      console.error('💥 Error adding series:', error);
+
+    } catch (err) {
       error('Error', t('addSeriesError'));
       setIsAddingSeries(false);
     }

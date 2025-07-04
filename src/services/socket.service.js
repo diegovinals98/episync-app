@@ -21,7 +21,7 @@ class SocketService {
     return new Promise((resolve, reject) => {
       try {
         console.log('🔌 Iniciando conexión Socket.IO...');
-        console.log('📍 URL del servidor:', ENV.SOCKET_URL || 'http://localhost:4000');
+        console.log('📍 URL del servidor:', ENV.SOCKET_URL || 'https://episync.bodasofiaydiego.es');
         console.log('🚪 Room ID solicitado:', roomId);
         console.log('🔑 Token proporcionado:', token ? 'Sí' : 'No');
         
@@ -51,7 +51,7 @@ class SocketService {
 
         // Crear nueva conexión
         this.connectionPromise = new Promise((innerResolve, innerReject) => {
-          this.socket = io(ENV.SOCKET_URL || 'http://localhost:4000', {
+          this.socket = io(ENV.SOCKET_URL || 'https://episync.bodasofiaydiego.es', {
             auth: {
               token: token
             },
@@ -384,22 +384,10 @@ class SocketService {
       groupId: groupId,
       roomId: this.currentRoom,
       addSeriesDto: {
-        tmdb_id: seriesData.tmdb_id,
-        name: seriesData.name,
-        poster_url: seriesData.poster_url,
-        overview: seriesData.overview,
-        first_air_date: seriesData.first_air_date,
-        vote_average: seriesData.vote_average,
-        vote_count: seriesData.vote_count,
-        popularity: seriesData.popularity,
-        timestamp: new Date().toISOString()
+        ...seriesData
       }
     };
-
-    console.log('📺 Añadiendo serie al grupo');
-    console.log('📊 Payload emitido:', data);
     this.socket.emit('add_series_to_group', data);
-    console.log('✅ Evento add_series_to_group enviado');
   }
 
   /**
