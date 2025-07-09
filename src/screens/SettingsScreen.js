@@ -18,6 +18,7 @@ import { createComponentStyles } from '../styles/components';
 import { colors } from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import notificationRegistrationService from '../services/notificationRegistration.service';
 
 const SettingsScreen = ({ navigation }) => {
   const { isDarkMode, themeMode, setThemeMode } = useTheme();
@@ -53,6 +54,26 @@ const SettingsScreen = ({ navigation }) => {
   // Guardar cambios (simulado)
   const handleSave = () => {
     success('Cambios guardados', 'Tus cambios han sido guardados correctamente');
+  };
+
+  // Manejar notificaciones push
+  const handlePushNotifications = async () => {
+    try {
+      success('Registrando...', 'Configurando notificaciones push...');
+      
+      const result = await notificationRegistrationService.registerAndSaveToken(user?.accessToken);
+      
+      if (result.success) {
+        success('Notificaciones activadas', 'Las notificaciones push están ahora activas');
+        setNotifications(true);
+      } else {
+        error('Error', 'No se pudieron activar las notificaciones push');
+        setNotifications(false);
+      }
+    } catch (err) {
+      error('Error', 'Error al configurar las notificaciones push');
+      setNotifications(false);
+    }
   };
 
   // Cerrar sesión
@@ -282,7 +303,7 @@ const SettingsScreen = ({ navigation }) => {
             rightElement: (
               <Switch
                 value={notifications}
-                onValueChange={setNotifications}
+                onValueChange={handlePushNotifications}
                 thumbColor={notifications ? colors.primary[500] : (isDarkMode ? colors.dark.border : colors.light.border)}
                 trackColor={{ 
                   false: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary, 
@@ -290,7 +311,15 @@ const SettingsScreen = ({ navigation }) => {
                 }}
               />
             ),
-            onPress: () => setNotifications(!notifications),
+            onPress: handlePushNotifications,
+          })}
+          {renderSettingItem({
+            icon: 'push-outline',
+            title: 'Notificaciones Push',
+            subtitle: 'Recibir notificaciones de actividad del grupo',
+            rightElement: <Ionicons name="chevron-forward" size={16} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />,
+            onPress: handlePushNotifications,
+            showBorder: false,
           })}
         </View>
 

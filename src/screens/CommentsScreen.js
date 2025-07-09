@@ -245,6 +245,8 @@ const CommentsScreen = ({ navigation, route }) => {
     if (socketService.socket && socketService.isConnected) {
       socketService.socket.emit('add_comment', payload);
       console.log('🟢 Evento add_comment emitido:', payload);
+      
+
     } else {
       console.warn('⚠️ Socket no conectado, no se pudo emitir add_comment');
     }

@@ -228,6 +228,9 @@ const GroupDetailScreen = ({ route, navigation }) => {
         seriesData = data;
         success('Serie añadida', `${seriesData.name || seriesData.series_name} se añadió al grupo`);
       }
+      
+
+      
       // Construir poster_url si viene poster_path pero no poster_url
       let poster_url = seriesData.poster_url;
       if (!poster_url && seriesData.poster_path) {

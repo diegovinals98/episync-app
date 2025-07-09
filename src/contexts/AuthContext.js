@@ -9,6 +9,7 @@ import { ENDPOINTS } from '../config/api';
 import { ENV } from '../config/env';
 import { useToast } from './ToastContext';
 import socketService from '../services/socket.service';
+import notificationRegistrationService from '../services/notificationRegistration.service';
 
 // Configurar WebBrowser para auth
 WebBrowser.maybeCompleteAuthSession();
@@ -147,6 +148,22 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.setItem('accessToken', access);
       await AsyncStorage.setItem('refreshToken', refresh);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
+      
+      // Registrar notificaciones push después de guardar los tokens
+      try {
+        console.log('📱 Registrando notificaciones push...');
+        const registrationResult = await notificationRegistrationService.registerAndSaveToken(access);
+        
+        if (registrationResult.success) {
+          console.log('✅ Notificaciones push registradas exitosamente');
+          // Opcional: Mostrar toast de éxito
+          // success('Notificaciones', 'Notificaciones push activadas');
+        } else {
+          console.log('⚠️ No se pudieron registrar las notificaciones push:', registrationResult.error);
+        }
+      } catch (notificationError) {
+        console.error('❌ Error registrando notificaciones push:', notificationError);
+      }
     } catch (error) {
       console.error('Error saving tokens:', error);
     }

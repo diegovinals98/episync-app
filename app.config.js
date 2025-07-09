@@ -1,8 +1,11 @@
+const version = "1.0.1";
+const buildNumber = "7";
+
 export default {
   expo: {
     name: "Episync",
     slug: "episync",
-    version: "1.0.0",
+    version: version,
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -17,14 +20,19 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.episync.app"
+      bundleIdentifier: "com.episync.app",
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false
+      },
+      buildNumber: buildNumber
     },
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
-      package: "com.episync.app"
+      package: "com.episync.app",
+      versionCode: parseInt(buildNumber)
     },
     web: {
       favicon: "./assets/favicon.png"

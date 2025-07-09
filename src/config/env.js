@@ -7,7 +7,7 @@
 
 // Valores por defecto (para desarrollo)
 const defaultConfig = {
-  // API
+  // API - Para Expo Go, usar IP de tu computadora
   API_URL: 'https://episync.bodasofiaydiego.es',
   
   // Entorno
@@ -15,11 +15,11 @@ const defaultConfig = {
   
   // OAuth
   GOOGLE_CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID',
-  APPLE_CLIENT_ID: 'YOUR_APPLE_CLIENT_ID',
+  APPLE_CLIENT_ID: 'AAJC7S5F5Q',
   
   // App
   APP_NAME: 'EPISYNC',
-  APP_VERSION: '1.0.0',
+  APP_VERSION: '1.0.1',
   
   // Características
   ENABLE_ANALYTICS: false,
