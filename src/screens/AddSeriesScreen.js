@@ -14,6 +14,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useLoading } from '../contexts/LoadingContext';
 import { colors } from '../styles/colors';
 import { createComponentStyles } from '../styles/components';
 import apiService from '../services/api.service';
@@ -35,6 +36,7 @@ const AddSeriesScreen = ({ navigation, route }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isAddingSeries, setIsAddingSeries] = useState(false);
+  const { setGlobalLoading } = useLoading();
   const [selectedSeries, setSelectedSeries] = useState(null);
 
   // Función para buscar series en TMDB
@@ -110,6 +112,7 @@ const AddSeriesScreen = ({ navigation, route }) => {
 
     try {
       setIsAddingSeries(true);
+      setGlobalLoading(true, t('addingSeries') || 'Añadiendo serie...');
 
       // 1. Obtener detalles completos de TMDB
       const tmdbId = series.id;
@@ -146,10 +149,12 @@ const AddSeriesScreen = ({ navigation, route }) => {
 
       // 3. Enviar por socket
       socketService.addSeriesToGroup(groupIdFinal, seriesData);
+      // El loading se detendrá cuando llegue el evento de socket
 
     } catch (err) {
       error('Error', t('addSeriesError'));
       setIsAddingSeries(false);
+      setGlobalLoading(false);
     }
   }, [groupIdFinal, getAuthHeaders, error, t]);
 
@@ -158,6 +163,7 @@ const AddSeriesScreen = ({ navigation, route }) => {
     const handleSeriesAdded = (data) => {
       console.log('📺 Evento series-added-to-group recibido:', data);
       setIsAddingSeries(false);
+      setGlobalLoading(false);
       if (data && data.success) {
         console.log('✅ Serie añadida exitosamente, navegando de vuelta');
         success(t('seriesAdded'), data.message || t('seriesAddedSuccess'));
@@ -172,6 +178,7 @@ const AddSeriesScreen = ({ navigation, route }) => {
 
     const handleSeriesError = (errorData) => {
       setIsAddingSeries(false);
+      setGlobalLoading(false);
       error('Error', errorData.message || t('addSeriesError'));
     };
 
@@ -405,32 +412,6 @@ const AddSeriesScreen = ({ navigation, route }) => {
           </View>
         )}
       </ScrollView>
-
-      {/* Loading overlay */}
-      {isAddingSeries && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-          <View style={{
-            backgroundColor: isDarkMode ? colors.dark.surface : colors.light.surface,
-            borderRadius: 16,
-            padding: 24,
-            alignItems: 'center',
-          }}>
-            <ActivityIndicator size="large" color={colors.primary[500]} />
-            <Text style={[createComponentStyles(isDarkMode).text, { marginTop: 16 }]}>
-              {t('addingSeries')}
-            </Text>
-          </View>
-        </View>
-      )}
     </View>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, FlatList } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, FlatList, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import apiService from '../services/api.service';
@@ -61,7 +61,35 @@ const GroupSeriesDetailScreen = ({ navigation, route }) => {
 
   // Función para manejar la eliminación de la serie
   const handleDeleteSeries = () => {
-    info('En desarrollo', t('deleteSeriesInProgress'));
+    Alert.alert(
+      t('deleteSeries'),
+      t('deleteSeriesConfirmation'),
+      [
+        {
+          text: t('cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: () => {
+            if (!group?.id || !series?.id) {
+              error('Error', 'Faltan datos para eliminar la serie');
+              return;
+            }
+
+            if (!socketService.getConnectionStatus()) {
+              error('Error', 'No hay conexión con el servidor');
+              return;
+            }
+
+            console.log('🗑️ Eliminando serie:', { groupId: group.id, seriesId: series.id });
+            socketService.removeSeriesFromGroup(group.id, series.id);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   // Función para manejar los comentarios
@@ -126,6 +154,77 @@ const GroupSeriesDetailScreen = ({ navigation, route }) => {
       fetchMembersProgress();
     }, [group?.id, series?.id, accessToken, membersProgress.length])
   );
+
+  // Configurar listeners de socket para eliminación de serie
+  useEffect(() => {
+    const handleSeriesDeleted = (data) => {
+      console.log('🗑️ Serie eliminada (series-deleted recibido):', data);
+      
+      // Verificar que los datos correspondan a la serie actual
+      let seriesId = data.data?.series_id || data.data?.seriesId || data.data?.id || data.series_id || data.seriesId;
+      let groupId = data.data?.groupId || data.groupId;
+      
+      // Verificar si es la serie actual comparando con diferentes campos posibles
+      const isCurrentSeries = 
+        seriesId === series?.id || 
+        seriesId === series?.series_id || 
+        seriesId === series?.seriesId ||
+        (data.data?.tmdb_id && data.data.tmdb_id === series?.tmdb_id);
+      
+      // Si es la serie actual, navegar de vuelta (no necesitamos verificar groupId porque estamos en el room de la serie)
+      if (isCurrentSeries) {
+        console.log('✅ Serie actual eliminada, navegando de vuelta');
+        success('Serie eliminada', data.message || 'La serie ha sido eliminada del grupo');
+        // Navegar de vuelta a la pantalla del grupo
+        setTimeout(() => {
+          console.log('🚀 Ejecutando navegación de vuelta...');
+          navigation.goBack();
+        }, 300);
+      } else {
+        console.log('ℹ️ Serie eliminada pero no es la actual, ignorando');
+        console.log('📊 Comparación:', {
+          groupId,
+          currentGroupId: group?.id,
+          seriesId,
+          currentSeriesId: series?.id,
+          currentSeriesSeriesId: series?.series_id,
+          isCurrentSeries
+        });
+      }
+    };
+
+    const handleSeriesRemoved = (data) => {
+      console.log('🗑️ Serie eliminada del grupo (evento recibido):', data);
+      
+      // Verificar que los datos correspondan a la serie actual
+      if (data.groupId === group?.id && data.seriesId === series?.id) {
+        console.log('✅ Serie actual eliminada, navegando de vuelta');
+        success('Serie eliminada', data.message || 'La serie ha sido eliminada del grupo');
+        // Navegar de vuelta a la pantalla del grupo
+        setTimeout(() => {
+          console.log('🚀 Ejecutando navegación de vuelta...');
+          navigation.navigate('GroupDetail', { group });
+        }, 300);
+      } else {
+        console.log('ℹ️ Serie eliminada pero no es la actual, ignorando');
+      }
+    };
+
+    const handleSeriesRemovedError = (errorData) => {
+      console.error('❌ Error al eliminar serie:', errorData);
+      error('Error', errorData.message || 'No se pudo eliminar la serie');
+    };
+
+    socketService.on('series-deleted', handleSeriesDeleted);
+    socketService.on('series-removed-from-group', handleSeriesRemoved);
+    socketService.on('series-removed-error', handleSeriesRemovedError);
+
+    return () => {
+      socketService.off('series-deleted', handleSeriesDeleted);
+      socketService.off('series-removed-from-group', handleSeriesRemoved);
+      socketService.off('series-removed-error', handleSeriesRemovedError);
+    };
+  }, [group?.id, series?.id, series?.series_id, navigation, success, error, group]);
 
   // Configurar listeners de socket para actualización en tiempo real
   useEffect(() => {

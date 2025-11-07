@@ -491,6 +491,34 @@ class ApiService {
       return this.handleError(error);
     }
   }
+
+  /**
+   * Obtiene los próximos capítulos/episodios del usuario
+   * @param {Object} headers - Headers con el token de autenticación
+   * @param {Object} options - Opciones adicionales (limit, offset, etc.)
+   * @returns {Promise} La respuesta con los próximos episodios
+   */
+  async getUpcomingEpisodes(headers = {}, options = {}) {
+    try {
+      const { limit, offset } = options;
+      let endpoint = ENDPOINTS.episodes.upcoming;
+      
+      // Agregar query params si se proporcionan
+      const params = new URLSearchParams();
+      if (limit) params.append('limit', limit);
+      if (offset) params.append('offset', offset);
+      
+      if (params.toString()) {
+        endpoint += `?${params.toString()}`;
+      }
+      
+      const response = await this.get(endpoint, headers);
+      console.log('🔍 Upcoming episodes response:', response);
+      return this.normalizeResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
 }
 
 // Exportar una instancia única del servicio

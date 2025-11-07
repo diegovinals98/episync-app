@@ -38,7 +38,8 @@ export default {
       favicon: "./assets/favicon.png"
     },
     plugins: [
-      "expo-image-picker"
+      "expo-image-picker",
+      "expo-web-browser"
     ],
     extra: {
       eas: {

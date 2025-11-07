@@ -8,7 +8,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // URLs de la API
 const API_CONFIG = {
   development: {
-    baseUrl: 'https://episync.bodasofiaydiego.es',
+    baseUrl: 'http://localhost:4000',
     timeout: 10000, // 10 segundos
   },
   production: {
@@ -58,6 +58,7 @@ export const ENDPOINTS = {
   episodes: {
     markWatched: (episodeId) => `/episodes/${episodeId}/watched`,
     markUnwatched: (episodeId) => `/episodes/${episodeId}/unwatched`,
+    upcoming: '/api/v1/episodes/upcoming',
   },
   upload: {
     image: '/api/v1/upload/image',

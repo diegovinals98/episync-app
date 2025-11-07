@@ -8,7 +8,7 @@
 // Valores por defecto (para desarrollo)
 const defaultConfig = {
   // API - Para Expo Go, usar IP de tu computadora
-  API_URL: 'https://episync.bodasofiaydiego.es',
+  API_URL: 'http://localhost:4000',
   
   // Entorno
   NODE_ENV: 'development',
@@ -53,7 +53,7 @@ export const ENV = {
   ENABLE_CRASH_REPORTING: process.env.ENABLE_CRASH_REPORTING === 'true' || defaultConfig.ENABLE_CRASH_REPORTING,
   
   // Socket
-  SOCKET_URL: 'https://episync.bodasofiaydiego.es',
+  SOCKET_URL: 'http://localhost:4000',
 };
 
 export default ENV; 

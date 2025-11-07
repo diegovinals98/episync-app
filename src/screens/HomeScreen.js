@@ -44,11 +44,12 @@ const HomeScreen = ({ navigation }) => {
   });
   const [userSeries, setUserSeries] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [nextEpisodes, setNextEpisodes] = useState([]);
+  const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
 
   // Obtener nombre completo del usuario
   const fullName = user ? `${user.name} ${user.lastname}` : 'Usuario';
 
-  const mockNextEpisodes = [];
   const mockRecentActivity = [];
 
   // Conexión al room de usuario al abrir la app
@@ -83,13 +84,39 @@ const HomeScreen = ({ navigation }) => {
     };
   }, []);
 
-  // Función para obtener los grupos del usuario
+  // Función para obtener los grupos del usuario y próximos episodios
   const fetchUserGroups = useCallback(async () => {
     try {
       setIsLoadingGroups(true);
+      setIsLoadingEpisodes(true);
       const headers = getAuthHeaders();
-      const response = await apiService.getUserGroups(headers);
-      console.log('response getUserGroups', response);
+      
+      // Llamar a ambos endpoints en paralelo
+      const [groupsResponse, episodesResponse] = await Promise.all([
+        apiService.getUserGroups(headers),
+        apiService.getUpcomingEpisodes(headers, { limit: 10 })
+      ]);
+      
+      console.log('response getUserGroups', groupsResponse);
+      console.log('response getUpcomingEpisodes', episodesResponse);
+      
+      // Procesar respuesta de próximos episodios
+      if (episodesResponse.success) {
+        const episodesData = episodesResponse.normalizedData || episodesResponse.data;
+        if (episodesData && episodesData.episodes && Array.isArray(episodesData.episodes)) {
+          setNextEpisodes(episodesData.episodes);
+          console.log('✅ Próximos episodios cargados:', episodesData.episodes.length);
+        } else {
+          setNextEpisodes([]);
+          console.log('ℹ️ No hay próximos episodios disponibles');
+        }
+      } else {
+        console.error('Error al obtener próximos episodios:', episodesResponse.message);
+        setNextEpisodes([]);
+      }
+      
+      // Procesar respuesta de grupos
+      const response = groupsResponse;
       
       if (response.success && response.normalizedData && response.normalizedData.groups) {
         const groupsData = response.normalizedData.groups;
@@ -189,8 +216,10 @@ const HomeScreen = ({ navigation }) => {
       // Usar datos simulados como fallback
       
       setRecentActivity(mockRecentActivity);
+      setNextEpisodes([]);
     } finally {
       setIsLoadingGroups(false);
+      setIsLoadingEpisodes(false);
     }
   }, [getAuthHeaders, error]);
 
@@ -813,8 +842,18 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.sectionTitle}>{t('upcomingEpisodes')}</Text>
               </View>
               
-              {mockNextEpisodes.length > 0 ? (
-                mockNextEpisodes
+              {isLoadingEpisodes ? (
+                [1, 2, 3].map((_, index) => (
+                  <View key={index} style={{ marginBottom: 8 }}>
+                    <Skeleton 
+                      width="100%" 
+                      height={70} 
+                      borderRadius={12} 
+                    />
+                  </View>
+                ))
+              ) : nextEpisodes.length > 0 ? (
+                nextEpisodes
                   .filter(episode => episode && typeof episode === 'object' && episode.id)
                   .map((episode) => (
                     <TouchableOpacity 
@@ -828,24 +867,42 @@ const HomeScreen = ({ navigation }) => {
                         marginBottom: 8,
                       }}
                     >
-                      <View style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        marginRight: 12,
-                      }}>
-                        <Text style={{ fontSize: 20 }}>{episode.image || '📺'}</Text>
-                      </View>
+                      {episode.still_path ? (
+                        <Image
+                          source={{ uri: `https://image.tmdb.org/t/p/w200${episode.still_path}` }}
+                          style={{
+                            width: 60,
+                            height: 40,
+                            borderRadius: 8,
+                            marginRight: 12,
+                            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                          }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={{
+                          width: 60,
+                          height: 40,
+                          borderRadius: 8,
+                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: 12,
+                        }}>
+                          <Text style={{ fontSize: 20 }}>📺</Text>
+                        </View>
+                      )}
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.listItemTitle}>{episode.series || 'Serie'}</Text>
-                        <Text style={styles.listItemSubtitle}>{episode.episode || 'Episodio'}</Text>
+                        <Text style={styles.listItemTitle}>
+                          {episode.series?.name || episode.series || 'Serie'}
+                        </Text>
+                        <Text style={styles.listItemSubtitle}>
+                          S{episode.season_number || 0}E{episode.episode_number || 0} - {episode.name || 'Episodio'}
+                        </Text>
                       </View>
                       <View>
                         <Text style={[styles.listItemSubtitle, { color: colors.primary[500], fontWeight: '600' }]}>
-                          {episode.date || 'Próximamente'}
+                          {episode.air_date ? new Date(episode.air_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : (episode.days_until_air ? `En ${episode.days_until_air} días` : 'Próximamente')}
                         </Text>
                       </View>
                     </TouchableOpacity>

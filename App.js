@@ -5,6 +5,7 @@ import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { ToastProvider } from './src/contexts/ToastContext';
+import { LoadingProvider } from './src/contexts/LoadingContext';
 import notificationRegistrationService from './src/services/notificationRegistration.service';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -24,10 +25,10 @@ import { colors } from './src/styles/colors';
 import { Alert } from "react-native";
 
 
-fetch("https://episync.bodasofiaydiego.es/api/v1/health")
+fetch("http://localhost:4000/api/v1/health")
   .then(res => {
     return res.text().then(text => {
-      Alert.alert(`Status: ${res.status}`, text);
+      //Alert.alert(`Status: ${res.status}`, text);
     });
   })
   .catch(err => {
@@ -184,13 +185,15 @@ export default function App() {
       <AuthProvider>
         <LanguageProvider>
           <ThemeProvider>
-            <AppContent />
-            <Toast config={{
-              success: (props) => <CustomToast {...props} type="success" />,
-              error: (props) => <CustomToast {...props} type="error" />,
-              info: (props) => <CustomToast {...props} type="info" />,
-              warning: (props) => <CustomToast {...props} type="warning" />,
-            }} />
+            <LoadingProvider>
+              <AppContent />
+              <Toast config={{
+                success: (props) => <CustomToast {...props} type="success" />,
+                error: (props) => <CustomToast {...props} type="error" />,
+                info: (props) => <CustomToast {...props} type="info" />,
+                warning: (props) => <CustomToast {...props} type="warning" />,
+              }} />
+            </LoadingProvider>
           </ThemeProvider>
         </LanguageProvider>
       </AuthProvider>

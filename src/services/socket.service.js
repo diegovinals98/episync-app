@@ -21,7 +21,7 @@ class SocketService {
     return new Promise((resolve, reject) => {
       try {
         console.log('🔌 Iniciando conexión Socket.IO...');
-        console.log('📍 URL del servidor:', ENV.SOCKET_URL || 'https://episync.bodasofiaydiego.es');
+        console.log('📍 URL del servidor:', ENV.SOCKET_URL || 'http://localhost:4000');
         console.log('🚪 Room ID solicitado:', roomId);
         console.log('🔑 Token proporcionado:', token ? 'Sí' : 'No');
         
@@ -51,7 +51,7 @@ class SocketService {
 
         // Crear nueva conexión
         this.connectionPromise = new Promise((innerResolve, innerReject) => {
-          this.socket = io(ENV.SOCKET_URL || 'https://episync.bodasofiaydiego.es', {
+          this.socket = io(ENV.SOCKET_URL || 'http://localhost:4000', {
             auth: {
               token: token
             },
@@ -155,6 +155,23 @@ class SocketService {
           this.socket.on('series-added-error', (error) => {
             console.error('❌ Error añadiendo serie al grupo:', error);
             this.emitEvent('series-added-error', error);
+          });
+
+          this.socket.on('series-removed-from-group', (data) => {
+            console.log('🗑️ Serie eliminada del grupo:', data);
+            console.log('📊 Emitiendo evento series-removed-from-group a los listeners');
+            this.emitEvent('series-removed-from-group', data);
+          });
+
+          this.socket.on('series-removed-error', (error) => {
+            console.error('❌ Error eliminando serie del grupo:', error);
+            this.emitEvent('series-removed-error', error);
+          });
+
+          this.socket.on('series-deleted', (data) => {
+            console.log('🗑️ Serie eliminada (series-deleted):', data);
+            console.log('📊 Emitiendo evento series-deleted a los listeners');
+            this.emitEvent('series-deleted', data);
           });
 
           this.socket.on('error', (error) => {
@@ -388,6 +405,26 @@ class SocketService {
       }
     };
     this.socket.emit('add_series_to_group', data);
+  }
+
+  /**
+   * Elimina una serie del grupo
+   * @param {string|number} groupId - ID real del grupo
+   * @param {string|number} seriesId - ID de la serie a eliminar
+   */
+  removeSeriesFromGroup(groupId, seriesId) {
+    if (!this.socket || !this.isConnected) {
+      console.error('❌ Socket no conectado');
+      return;
+    }
+
+    const data = {
+      groupId: groupId,
+      seriesId: seriesId,
+      roomId: this.currentRoom
+    };
+    console.log('🗑️ Enviando solicitud para eliminar serie:', data);
+    this.socket.emit('remove_series_from_group', data);
   }
 
   /**

@@ -6,7 +6,7 @@ Aplicación móvil para gestionar series con familia y amigos.
 
 ### Desarrollo local
 
-La aplicación está configurada para conectarse a un backend local en `https://episync.bodasofiaydiego.es`.
+La aplicación está configurada para conectarse a un backend local en `http://localhost:4000`.
 
 Para ejecutar la aplicación en modo desarrollo:
 
@@ -57,7 +57,7 @@ src/
 
 La aplicación está configurada para conectarse a:
 
-- **Desarrollo**: `https://episync.bodasofiaydiego.es`
+- **Desarrollo**: `http://localhost:4000`
 - **Producción**: `https://api.episync.com` (URL ficticia por ahora)
 
 Para cambiar la URL de la API, modifica el archivo `src/config/api.js`.

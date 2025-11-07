@@ -161,7 +161,7 @@ const CommentsScreen = ({ navigation, route }) => {
       if (!group?.id || !series?.id) return;
       setLoading(true);
       try {
-        const response = await fetch(`https://episync.bodasofiaydiego.es/api/v1/groups/${group.id}/series/${series.id}/comments`);
+        const response = await fetch(`http://localhost:4000/api/v1/groups/${group.id}/series/${series.id}/comments`);
         const json = await response.json();
         if (json.success && Array.isArray(json.data)) {
           // Convertir los comentarios al formato usado en la UI

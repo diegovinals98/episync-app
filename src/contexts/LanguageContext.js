@@ -179,6 +179,7 @@ export const translations = {
     deleteSeriesConfirmation: '¿Eliminar esta serie del grupo?',
     deleteSeriesComingSoon: 'Función de eliminación en desarrollo',
     deleteSeriesInProgress: 'Eliminación en proceso de construcción',
+    delete: 'Eliminar',
     
     // Comentarios
     comments: 'Comentarios',
@@ -374,6 +375,7 @@ export const translations = {
     deleteSeriesConfirmation: 'Delete this series from the group?',
     deleteSeriesComingSoon: 'Delete function in development',
     deleteSeriesInProgress: 'Delete feature under construction',
+    delete: 'Delete',
     
     // Comments
     comments: 'Comments',

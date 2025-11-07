@@ -283,10 +283,75 @@ const GroupDetailScreen = ({ route, navigation }) => {
 
     // Registrar listeners siempre (el socket service maneja la conexión internamente)
     console.log('🔧 Registrando listeners de socket para GroupDetailScreen');
+    const handleSeriesRemovedFromGroup = (data) => {
+      console.log('🗑️ Serie eliminada del grupo:', data);
+      
+      // Extraer los datos de la serie eliminada del evento
+      let seriesId;
+      if (data.seriesId) {
+        seriesId = data.seriesId;
+      } else if (data.data && data.data.seriesId) {
+        seriesId = data.data.seriesId;
+      } else if (data.id) {
+        seriesId = data.id;
+      }
+
+      if (seriesId) {
+        console.log('🗑️ Eliminando serie con ID:', seriesId);
+        setSeries(prevSeries => prevSeries.filter(s => s.id !== seriesId && s.series_id !== seriesId));
+        setGroupInfo(prevGroupInfo => ({
+          ...prevGroupInfo,
+          series_count: Math.max(0, (prevGroupInfo.series_count || 0) - 1)
+        }));
+        success('Serie eliminada', data.message || 'La serie ha sido eliminada del grupo');
+      } else {
+        console.error('❌ No se pudo identificar el ID de la serie eliminada');
+      }
+    };
+
+    const handleSeriesDeleted = (data) => {
+      console.log('🗑️ Serie eliminada (series-deleted):', data);
+      
+      // Extraer los datos de la serie eliminada del evento
+      let seriesId;
+      if (data.data && data.data.series_id) {
+        seriesId = data.data.series_id;
+      } else if (data.data && data.data.seriesId) {
+        seriesId = data.data.seriesId;
+      } else if (data.data && data.data.id) {
+        seriesId = data.data.id;
+      } else if (data.series_id) {
+        seriesId = data.series_id;
+      } else if (data.seriesId) {
+        seriesId = data.seriesId;
+      } else if (data.id) {
+        seriesId = data.id;
+      }
+
+      if (seriesId) {
+        console.log('🗑️ Eliminando serie con ID:', seriesId);
+        setSeries(prevSeries => prevSeries.filter(s => 
+          s.id !== seriesId && 
+          s.series_id !== seriesId &&
+          s.seriesId !== seriesId
+        ));
+        setGroupInfo(prevGroupInfo => ({
+          ...prevGroupInfo,
+          series_count: Math.max(0, (prevGroupInfo.series_count || 0) - 1)
+        }));
+        success('Serie eliminada', data.message || 'La serie ha sido eliminada del grupo');
+      } else {
+        console.error('❌ No se pudo identificar el ID de la serie eliminada en series-deleted');
+        console.error('📊 Datos recibidos:', JSON.stringify(data, null, 2));
+      }
+    };
+
     socketService.on('user_joined_group', handleUserJoinedGroup);
     socketService.on('user_left_group', handleUserLeftGroup);
     socketService.on('group_error', handleGroupError);
     socketService.on('series-added-to-group', handleSeriesAddedToGroup);
+    socketService.on('series-removed-from-group', handleSeriesRemovedFromGroup);
+    socketService.on('series-deleted', handleSeriesDeleted);
     socketService.on('error', handleGenericError);
     console.log('✅ Listeners registrados correctamente');
 
@@ -296,6 +361,8 @@ const GroupDetailScreen = ({ route, navigation }) => {
       socketService.off('user_left_group', handleUserLeftGroup);
       socketService.off('group_error', handleGroupError);
       socketService.off('series-added-to-group', handleSeriesAddedToGroup);
+      socketService.off('series-removed-from-group', handleSeriesRemovedFromGroup);
+      socketService.off('series-deleted', handleSeriesDeleted);
       socketService.off('error', handleGenericError);
     };
   }, [socketConnected, success, error]);
