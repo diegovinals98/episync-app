@@ -2,20 +2,36 @@
  * Configuración de la API para diferentes entornos
  */
 
+import { ENV } from './env';
+
 // Detectar el entorno actual
 const isProduction = process.env.NODE_ENV === 'production';
 
 // URLs de la API
 const API_CONFIG = {
   development: {
-    baseUrl: 'http://localhost:4000',
+    baseUrl: ENV.API_URL || 'http://localhost:4000', // Usa la URL del .env
     timeout: 10000, // 10 segundos
   },
   production: {
-    baseUrl: 'https://api.episync.com', // URL de producción (por ahora es ficticia)
+    baseUrl: (() => {
+      // Intentar importar API_URL_PROD desde @env
+      try {
+        const { API_URL_PROD } = require('@env');
+        return API_URL_PROD || ENV.API_URL || 'https://api.episync.com';
+      } catch {
+        return ENV.API_URL || 'https://api.episync.com';
+      }
+    })(), // URL de producción
     timeout: 15000, // 15 segundos
   }
 };
+
+// Validar que baseUrl esté definido
+if (!API_CONFIG.development.baseUrl) {
+  console.error('❌ ERROR: API_URL no está definida. Verifica tu archivo .env');
+}
+console.log('🔍 API baseUrl configurado:', API_CONFIG.development.baseUrl);
 
 // Exportar la configuración según el entorno
 export const API = isProduction ? API_CONFIG.production : API_CONFIG.development;
@@ -71,7 +87,13 @@ export const ENDPOINTS = {
  * @returns {string} La URL completa
  */
 export const buildApiUrl = (endpoint) => {
-  return `${API.baseUrl}${endpoint}`;
+  const baseUrl = API.baseUrl || ENV.API_URL || 'http://localhost:4000';
+  
+  // Asegurar que baseUrl no termine con / y endpoint no empiece con /
+  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  
+  return `${cleanBaseUrl}${cleanEndpoint}`;
 };
 
 export default {

@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { ENV } from '../config/env';
 
 async function registerForPushNotificationsAsync() {
   if (Platform.OS === 'android') {
@@ -52,7 +53,7 @@ async function registerForPushNotificationsAsync() {
 // Función para guardar el token en el backend
 async function saveTokenToBackend(token, accessToken) {
   try {
-    const response = await fetch('http://localhost:4000/api/v1/users/push-token', {
+    const response = await fetch(`${ENV.API_URL}/api/v1/users/push-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -81,7 +82,7 @@ async function saveTokenToBackend(token, accessToken) {
 // Función para actualizar el token en el backend
 async function updateTokenInBackend(token, accessToken) {
   try {
-    const response = await fetch('http://localhost:4000/api/v1/users/push-token', {
+    const response = await fetch(`${ENV.API_URL}/api/v1/users/push-token`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -110,7 +111,7 @@ async function updateTokenInBackend(token, accessToken) {
 // Función para eliminar el token del backend
 async function removeTokenFromBackend(accessToken) {
   try {
-    const response = await fetch('http://localhost:4000/api/v1/users/push-token', {
+    const response = await fetch(`${ENV.API_URL}/api/v1/users/push-token`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

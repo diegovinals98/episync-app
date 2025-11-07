@@ -23,9 +23,10 @@ import CommentsScreen from './src/screens/CommentsScreen';
 import Constants from 'expo-constants';
 import { colors } from './src/styles/colors';
 import { Alert } from "react-native";
+import { ENV } from './src/config/env';
 
 
-fetch("http://localhost:4000/api/v1/health")
+fetch(`${ENV.API_URL}/api/v1/health`)
   .then(res => {
     return res.text().then(text => {
       //Alert.alert(`Status: ${res.status}`, text);

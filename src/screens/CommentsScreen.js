@@ -18,6 +18,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { ENV } from '../config/env';
 import { createComponentStyles } from '../styles/components';
 import { colors } from '../styles/colors';
 import Skeleton from '../components/Skeleton';
@@ -161,7 +162,7 @@ const CommentsScreen = ({ navigation, route }) => {
       if (!group?.id || !series?.id) return;
       setLoading(true);
       try {
-        const response = await fetch(`http://localhost:4000/api/v1/groups/${group.id}/series/${series.id}/comments`);
+        const response = await fetch(`${ENV.API_URL}/api/v1/groups/${group.id}/series/${series.id}/comments`);
         const json = await response.json();
         if (json.success && Array.isArray(json.data)) {
           // Convertir los comentarios al formato usado en la UI

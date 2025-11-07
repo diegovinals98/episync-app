@@ -21,7 +21,7 @@ class SocketService {
     return new Promise((resolve, reject) => {
       try {
         console.log('🔌 Iniciando conexión Socket.IO...');
-        console.log('📍 URL del servidor:', ENV.SOCKET_URL || 'http://localhost:4000');
+        console.log('📍 URL del servidor:', ENV.SOCKET_URL);
         console.log('🚪 Room ID solicitado:', roomId);
         console.log('🔑 Token proporcionado:', token ? 'Sí' : 'No');
         
@@ -51,7 +51,7 @@ class SocketService {
 
         // Crear nueva conexión
         this.connectionPromise = new Promise((innerResolve, innerReject) => {
-          this.socket = io(ENV.SOCKET_URL || 'http://localhost:4000', {
+          this.socket = io(ENV.SOCKET_URL, {
             auth: {
               token: token
             },
