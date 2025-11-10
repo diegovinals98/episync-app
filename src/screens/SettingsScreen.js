@@ -9,6 +9,7 @@ import {
   StatusBar,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -78,12 +79,24 @@ const SettingsScreen = ({ navigation }) => {
 
   // Cerrar sesión
   const handleLogout = () => {
-    error('Cerrar Sesión', '¿Estás seguro de que quieres cerrar sesión?', 5000);
-    // Aquí podrías mostrar un modal de confirmación en lugar de un toast
-    // Por ahora, cerramos directamente
-    setTimeout(async () => {
-      await logout();
-    }, 1000);
+    Alert.alert(
+      t('logout'),
+      t('logoutConfirmation'),
+      [
+        {
+          text: t('cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('confirm'),
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const renderSectionHeader = (title) => (

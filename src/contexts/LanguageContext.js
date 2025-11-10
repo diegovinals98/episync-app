@@ -181,6 +181,11 @@ export const translations = {
     deleteSeriesInProgress: 'Eliminación en proceso de construcción',
     delete: 'Eliminar',
     
+    // Logout
+    logout: 'Cerrar Sesión',
+    logoutConfirmation: '¿Estás seguro de que quieres cerrar sesión?',
+    confirm: 'Confirmar',
+    
     // Comentarios
     comments: 'Comentarios',
     noComments: 'No hay comentarios',
@@ -376,6 +381,11 @@ export const translations = {
     deleteSeriesComingSoon: 'Delete function in development',
     deleteSeriesInProgress: 'Delete feature under construction',
     delete: 'Delete',
+    
+    // Logout
+    logout: 'Log Out',
+    logoutConfirmation: 'Are you sure you want to log out?',
+    confirm: 'Confirm',
     
     // Comments
     comments: 'Comments',

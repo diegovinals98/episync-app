@@ -1,5 +1,5 @@
-const version = "1.0.1";
-const buildNumber = "7";
+const version = "1.1";
+const buildNumber = "1";
 
 export default {
   expo: {

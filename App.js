@@ -26,16 +26,7 @@ import { Alert } from "react-native";
 import { ENV } from './src/config/env';
 
 
-fetch(`${ENV.API_URL}/api/v1/health`)
-  .then(res => {
-    return res.text().then(text => {
-      //Alert.alert(`Status: ${res.status}`, text);
-    });
-  })
-  .catch(err => {
-    Alert.alert("❌ Error de red", err.message);
-    console.error(err);
-  });
+
 
 const Stack = createNativeStackNavigator();
 

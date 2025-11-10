@@ -625,10 +625,32 @@ export const AuthProvider = ({ children }) => {
   // Logout
   const logout = async () => {
     try {
+      // Guardar tokens antes de limpiar el estado
+      const currentRefreshToken = refreshToken;
+      const currentAccessToken = accessToken;
+      
+      // Llamar al endpoint de logout con el refreshToken y el accessToken en el header
+      if (currentRefreshToken && currentAccessToken) {
+        try {
+          console.log('🚪 Llamando al endpoint de logout...');
+          const headers = getAuthHeaders();
+          await apiService.post(ENDPOINTS.auth.logout, { 
+            refreshToken: currentRefreshToken 
+          }, headers);
+          console.log('✅ Logout exitoso en el servidor');
+        } catch (logoutError) {
+          console.error('⚠️ Error al llamar al endpoint de logout:', logoutError);
+          // Continuar con el logout local aunque falle el endpoint
+        }
+      } else {
+        console.warn('⚠️ No hay tokens disponibles para llamar al endpoint de logout');
+      }
+      
       // Desconectar el socket antes del logout
       socketService.disconnect();
       console.log('🔌 Socket desconectado durante logout');
       
+      // Limpiar el storage y el estado
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
       await AsyncStorage.removeItem('user');
