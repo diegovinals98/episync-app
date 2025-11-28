@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { ENV } from '../config/env';
+import apiService from './api.service';
 
 async function registerForPushNotificationsAsync() {
   if (Platform.OS === 'android') {
@@ -166,7 +167,7 @@ async function registerAndSaveToken(accessToken) {
 }
 
 // Configurar manejadores de notificaciones
-function setupNotificationHandlers() {
+function setupNotificationHandlers(navigationRef, getAccessToken) {
   // Manejador para cuando la app está en primer plano
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -182,19 +183,74 @@ function setupNotificationHandlers() {
   });
 
   // Manejador para cuando se toca una notificación
-  const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-    console.log('👆 Notificación tocada:', response);
+  const responseListener = Notifications.addNotificationResponseReceivedListener(async (response) => {
+    console.log('👆 Notificación tocada');
     
     // Aquí puedes manejar la navegación basada en los datos de la notificación
     const data = response.notification.request.content.data;
     if (data) {
-      console.log('📊 Datos de la notificación:', data);
+      console.log('📊 Datos de la notificación:', JSON.stringify(data, null, 2));
       
-      // Ejemplo de navegación basada en el tipo de notificación
-      // if (data.type === 'series_added') {
-      //   // Navegar a la pantalla de detalles del grupo
-      //   navigation.navigate('GroupDetail', { groupId: data.groupId });
-      // }
+      // Navegación basada en el tipo de notificación
+      if (data.type === 'episode_watched') {
+        try {
+          const accessToken = getAccessToken ? await getAccessToken() : null;
+          
+          if (!accessToken) {
+            console.error('❌ No se pudo obtener el token de acceso');
+            return;
+          }
+
+          const headers = {
+            'Authorization': `Bearer ${accessToken}`,
+          };
+
+          // Obtener datos del grupo y la serie
+          if (data.groupId && data.seriesId) {
+            console.log('🔄 Obteniendo datos del grupo y la serie...');
+            
+            // Obtener detalles del grupo
+            const groupResponse = await apiService.getGroupDetails(data.groupId, headers);
+            const group = groupResponse?.data || groupResponse;
+            
+            // Obtener series del grupo
+            const seriesResponse = await apiService.getGroupSeries(data.groupId, headers);
+            const allSeries = seriesResponse?.data || seriesResponse || [];
+            
+            // Encontrar la serie específica
+            const series = allSeries.find(s => 
+              s.id === data.seriesId || 
+              s.tmdb_id === data.seriesId || 
+              s.tmdb_id?.toString() === data.seriesId?.toString()
+            );
+
+            // Obtener miembros del grupo
+            const membersResponse = await apiService.getGroupMembers(data.groupId, headers);
+            const members = membersResponse?.data || membersResponse || [];
+
+            if (group && series) {
+              console.log('✅ Datos obtenidos, navegando a GroupSeriesDetail');
+              
+              // Navegar a la pantalla de detalles de la serie del grupo
+              if (navigationRef?.current) {
+                navigationRef.current.navigate('GroupSeriesDetail', {
+                  group,
+                  series,
+                  members,
+                });
+              } else {
+                console.error('❌ navigationRef no está disponible');
+              }
+            } else {
+              console.error('❌ No se pudieron obtener los datos del grupo o la serie');
+            }
+          } else {
+            console.error('❌ Faltan groupId o seriesId en los datos de la notificación');
+          }
+        } catch (error) {
+          console.error('❌ Error navegando desde notificación:', error);
+        }
+      }
     }
   });
 

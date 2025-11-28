@@ -1,4 +1,4 @@
-const version = "1.1";
+const version = "1.2";
 const buildNumber = "1";
 
 export default {
@@ -7,7 +7,6 @@ export default {
     slug: "episync",
     version: version,
     orientation: "portrait",
-    icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
     scheme: "episync",
     splash: {
@@ -24,7 +23,8 @@ export default {
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
       },
-      buildNumber: buildNumber
+      buildNumber: buildNumber,
+      icon: "./assets/episync.icon",
     },
     android: {
       adaptiveIcon: {
@@ -39,7 +39,8 @@ export default {
     },
     plugins: [
       "expo-image-picker",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store"
     ],
     extra: {
       eas: {

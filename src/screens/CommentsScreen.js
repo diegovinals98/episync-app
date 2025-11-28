@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   Image,
@@ -12,6 +11,9 @@ import {
   Alert,
   LayoutAnimation,
   UIManager,
+  Keyboard,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -41,9 +43,9 @@ const CommentsScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [posting, setPosting] = useState(false);
-  const [editingComment, setEditingComment] = useState(null);
-  const [editText, setEditText] = useState('');
   const [socketConnected, setSocketConnected] = useState(false);
+  const flatListRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Generar room ID: comentario_idgrupo_idserie
   const roomId = `comentario_${group?.id}_${series?.id}`;
@@ -204,6 +206,29 @@ const CommentsScreen = ({ navigation, route }) => {
     return unsubscribe;
   }, [navigation, socketConnected, group?.id, series?.id]);
 
+  // Listener para el teclado - scroll automático cuando aparece
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        // Scroll al final cuando aparece el teclado
+        setTimeout(() => {
+          if (flatListRef.current && comments.length > 0) {
+            try {
+              flatListRef.current.scrollToIndex({ index: 0, animated: true });
+            } catch (e) {
+              // Ignorar errores de scroll
+            }
+          }
+        }, 300);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+    };
+  }, [comments.length]);
+
   // Función para formatear tiempo relativo
   const formatTimeAgo = (date) => {
     const now = new Date();
@@ -246,14 +271,19 @@ const CommentsScreen = ({ navigation, route }) => {
     if (socketService.socket && socketService.isConnected) {
       socketService.socket.emit('add_comment', payload);
       console.log('🟢 Evento add_comment emitido:', payload);
-      
-
     } else {
       console.warn('⚠️ Socket no conectado, no se pudo emitir add_comment');
     }
 
     setNewComment('');
     setPosting(false);
+    
+    // Scroll al final después de publicar
+    setTimeout(() => {
+      if (flatListRef.current && comments.length > 0) {
+        flatListRef.current.scrollToIndex({ index: 0, animated: true });
+      }
+    }, 100);
   };
 
   // Listener para comentarios nuevos desde el socket real
@@ -292,352 +322,377 @@ const CommentsScreen = ({ navigation, route }) => {
     info('En desarrollo', t('commentsInProgress'));
   };
 
-  // Función para editar comentario
-  const handleEdit = (comment) => {
-    setEditingComment(comment.id);
-    setEditText(comment.content);
-  };
-
-  // Función para guardar edición
-  const handleSaveEdit = () => {
-    if (!editText.trim()) return;
-    
-    setComments(prev => 
-      prev.map(comment => 
-        comment.id === editingComment 
-          ? { ...comment, content: editText.trim() }
-          : comment
-      )
-    );
-    
-    setEditingComment(null);
-    setEditText('');
-    info('En desarrollo', t('commentsInProgress'));
-  };
-
-  // Función para cancelar edición
-  const handleCancelEdit = () => {
-    setEditingComment(null);
-    setEditText('');
-  };
-
-  // Función para eliminar comentario
-  const handleDelete = (commentId) => {
-    Alert.alert(
-      t('deleteComment'),
-      '¿Estás seguro de que quieres eliminar este comentario?',
-      [
-        { text: t('cancelEdit'), style: 'cancel' },
-        { 
-          text: t('deleteComment'), 
-          style: 'destructive',
-          onPress: () => {
-            setComments(prev => prev.filter(comment => comment.id !== commentId));
-            info('En desarrollo', t('commentsInProgress'));
-          }
-        }
-      ]
-    );
-  };
-
   // Renderizar avatar de usuario
-  const renderAvatar = (user) => (
-    <View style={{
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.primary[500],
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 12,
-    }}>
-      {user.avatar ? (
-        <Image 
-          source={{ uri: user.avatar }} 
-          style={{ width: 40, height: 40, borderRadius: 20 }}
-        />
-      ) : (
-        <Ionicons name="person" size={20} color="white" />
-      )}
-    </View>
-  );
+  const renderAvatar = (user, isOwn = false) => {
+    const avatarSize = 36;
+    return (
+      <View style={{
+        width: avatarSize,
+        height: avatarSize,
+        borderRadius: avatarSize / 2,
+        backgroundColor: colors.primary[500],
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: isOwn ? 8 : 0,
+        marginLeft: isOwn ? 8 : 0,
+        marginRight: isOwn ? 0 : 8,
+        shadowColor: colors.primary[500],
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+      }}>
+        {user.avatar ? (
+          <Image 
+            source={{ uri: user.avatar }} 
+            style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }}
+          />
+        ) : (
+          <Ionicons name="person" size={18} color="white" />
+        )}
+      </View>
+    );
+  };
+
+  // Invertir los comentarios para que los más recientes estén abajo
+  const reversedComments = [...comments].reverse();
 
   // Renderizar un comentario
-  const renderComment = ({ item: comment }) => (
-    <View style={{
-      backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
-    }}>
-      <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-        {renderAvatar(comment.user)}
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.listItemTitle, { fontSize: 14 }]}>
-            {comment.user.name}
-          </Text>
-          <Text style={[styles.textSecondary, { fontSize: 12 }]}>
-            @{comment.user.username} • {formatTimeAgo(comment.created_at)} {t('ago')}
-          </Text>
+  const renderComment = ({ item: comment, index }) => {
+    const isOwn = comment.user.id === user?.id;
+    // Como la lista está invertida, el índice 0 es el último elemento visualmente
+    // Comparar con el siguiente elemento en el array (que visualmente está arriba)
+    const nextIndex = index + 1;
+    const showAvatar = index === reversedComments.length - 1 || reversedComments[nextIndex]?.user.id !== comment.user.id;
+    
+    return (
+      <View style={{
+        flexDirection: 'row',
+        marginBottom: 8,
+        paddingHorizontal: 16,
+        justifyContent: isOwn ? 'flex-end' : 'flex-start',
+      }}>
+        {!isOwn && (
+          <View style={{ width: 36, marginRight: 8 }}>
+            {showAvatar ? renderAvatar(comment.user, false) : <View style={{ width: 36 }} />}
+          </View>
+        )}
+        
+        <View style={{
+          maxWidth: '75%',
+          flexDirection: 'column',
+        }}>
+          {showAvatar && !isOwn && (
+            <Text style={{
+              fontSize: 12,
+              fontWeight: '600',
+              color: isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary,
+              marginBottom: 4,
+              marginLeft: 4,
+            }}>
+              {comment.user.name}
+            </Text>
+          )}
+          
+          <View style={{
+            backgroundColor: isOwn 
+              ? colors.primary[500] 
+              : (isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary),
+            borderRadius: 18,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderTopLeftRadius: isOwn ? 18 : 4,
+            borderTopRightRadius: isOwn ? 4 : 18,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+            elevation: 2,
+          }}>
+            <Text style={{
+              color: isOwn ? 'white' : (isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary),
+              fontSize: 15,
+              lineHeight: 20,
+            }}>
+              {comment.content}
+            </Text>
+            
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              marginTop: 6,
+              justifyContent: 'flex-end',
+            }}>
+              <Text style={{
+                fontSize: 11,
+                color: isOwn ? 'rgba(255, 255, 255, 0.7)' : (isDarkMode ? colors.dark.textTertiary : colors.light.textTertiary),
+              }}>
+                {formatTimeAgo(comment.created_at)}
+              </Text>
+            </View>
+          </View>
         </View>
-        {comment.user.id === user?.id && (
-          <View style={{ flexDirection: 'row' }}>
-            <TouchableOpacity 
-              onPress={() => handleEdit(comment)}
-              style={{ marginRight: 8 }}
-            >
-              <Ionicons 
-                name="pencil" 
-                size={16} 
-                color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} 
-              />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleDelete(comment.id)}>
-              <Ionicons 
-                name="trash" 
-                size={16} 
-                color={colors.error[500]} 
-              />
-            </TouchableOpacity>
+        
+        {isOwn && (
+          <View style={{ width: 36, marginLeft: 8 }}>
+            {showAvatar ? renderAvatar(comment.user, true) : <View style={{ width: 36 }} />}
           </View>
         )}
       </View>
-      
-      {editingComment === comment.id ? (
-        <View style={{ marginBottom: 8 }}>
-          <TextInput
-            style={[styles.input, { marginBottom: 8 }]}
-            value={editText}
-            onChangeText={setEditText}
-            placeholder={t('commentPlaceholder')}
-            placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
-            multiline
-          />
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-            <TouchableOpacity 
-              onPress={handleCancelEdit}
-              style={{ marginRight: 8 }}
-            >
-              <Text style={{ color: colors.error[500], fontWeight: '600' }}>
-                {t('cancelEdit')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleSaveEdit}>
-              <Text style={{ color: colors.primary[500], fontWeight: '600' }}>
-                {t('saveEdit')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <Text style={[styles.text, { marginBottom: 8 }]}>
-          {comment.content}
-        </Text>
-      )}
-      
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        
-        <TouchableOpacity 
-          onPress={() => handleReply(comment.id)}
-          style={{ flexDirection: 'row', alignItems: 'center' }}
-        >
-          <Ionicons 
-            name="chatbubble-outline" 
-            size={16} 
-            color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} 
-          />
-          <Text style={[styles.textSecondary, { marginLeft: 4, fontSize: 12 }]}>
-            {t('reply')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      
-      {/* Respuestas */}
-      {comment.replies && comment.replies.length > 0 && (
-        <View style={{ marginTop: 12, marginLeft: 20 }}>
-          {comment.replies.map(reply => (
-            <View key={reply.id} style={{
-              backgroundColor: isDarkMode ? colors.dark.surfaceTertiary : colors.light.surfaceTertiary,
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 8,
-            }}>
-              <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                {renderAvatar(reply.user)}
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.listItemTitle, { fontSize: 13 }]}>
-                    {reply.user.name}
-                  </Text>
-                  <Text style={[styles.textSecondary, { fontSize: 11 }]}>
-                    @{reply.user.username} • {formatTimeAgo(reply.created_at)} {t('ago')}
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.text, { fontSize: 13 }]}>
-                {reply.content}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
+    );
+  };
 
   // Renderizar skeleton mientras carga
-  const renderSkeleton = () => (
-    <View>
-      {[1, 2, 3].map((_, index) => (
-        <View key={index} style={{
-          backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: 12,
-        }}>
-          <View style={{ flexDirection: 'row', marginBottom: 12 }}>
-            <Skeleton width={40} height={40} borderRadius={20} style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Skeleton width={120} height={16} borderRadius={8} style={{ marginBottom: 4 }} />
-              <Skeleton width={80} height={12} borderRadius={6} />
+  const renderSkeleton = () => {
+    const screenWidth = Dimensions.get('window').width;
+    
+    return (
+      <View style={{ paddingTop: 16 }}>
+        {[1, 2, 3, 4, 5].map((_, index) => {
+          const messageWidth = (screenWidth - 32 - 36 - 8) * (index % 2 === 0 ? 0.6 : 0.55);
+          return (
+            <View 
+              key={index} 
+              style={{ 
+                flexDirection: 'row',
+                paddingHorizontal: 16,
+                marginBottom: 12,
+                justifyContent: index % 2 === 0 ? 'flex-start' : 'flex-end',
+                alignItems: 'flex-end',
+              }}
+            >
+              {index % 2 === 0 && (
+                <Skeleton 
+                  width={36} 
+                  height={36} 
+                  borderRadius={18} 
+                  style={{ marginRight: 8 }} 
+                />
+              )}
+              <View style={{
+                width: messageWidth,
+                backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
+                borderRadius: 18,
+                borderTopLeftRadius: index % 2 === 0 ? 4 : 18,
+                borderTopRightRadius: index % 2 === 0 ? 18 : 4,
+                padding: 12,
+              }}>
+                <Skeleton width={messageWidth * 0.8} height={14} borderRadius={7} style={{ marginBottom: 6 }} />
+                <Skeleton width={messageWidth * 0.6} height={14} borderRadius={7} style={{ marginBottom: 4 }} />
+                <Skeleton width={messageWidth * 0.4} height={10} borderRadius={5} />
+              </View>
+              {index % 2 !== 0 && (
+                <Skeleton 
+                  width={36} 
+                  height={36} 
+                  borderRadius={18} 
+                  style={{ marginLeft: 8 }} 
+                />
+              )}
             </View>
-          </View>
-          <Skeleton width="100%" height={16} borderRadius={8} style={{ marginBottom: 4 }} />
-          <Skeleton width="70%" height={16} borderRadius={8} style={{ marginBottom: 8 }} />
-          <Skeleton width={60} height={12} borderRadius={6} />
-        </View>
-      ))}
-    </View>
-  );
+          );
+        })}
+      </View>
+    );
+  };
 
   return (
-    <KeyboardAvoidingView 
-      style={[styles.container, { backgroundColor: isDarkMode ? colors.dark.background : colors.light.background }]}
+    <KeyboardAvoidingView
+      style={{ 
+        flex: 1, 
+        backgroundColor: isDarkMode ? colors.dark.background : colors.light.background 
+      }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <ScrollView 
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-      >
-        {/* Header de la serie */}
-        <View style={[styles.card, { marginBottom: 20, alignItems: 'center' }]}>
-          <Text style={[styles.cardTitle, { fontSize: 18, marginBottom: 8, textAlign: 'center' }]}>
-            {series?.name || t('series')}
-          </Text>
-          <Text style={[styles.textSecondary, { textAlign: 'center' }]}>
-            {t('comments')} • {comments.length} {comments.length === 1 ? 'comentario' : 'comentarios'}
-          </Text>
-        </View>
+      {/* Header de la serie */}
+      <View style={{
+        backgroundColor: isDarkMode ? colors.dark.surface : colors.light.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: isDarkMode ? colors.dark.border : colors.light.border,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+      }}>
+        <Text style={{
+          fontSize: 18,
+          fontWeight: '700',
+          color: isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary,
+          marginBottom: 4,
+        }}>
+          {series?.name || t('series')}
+        </Text>
+        <Text style={{
+          fontSize: 13,
+          color: isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary,
+        }}>
+          {comments.length} {comments.length === 1 ? 'comentario' : 'comentarios'}
+        </Text>
+      </View>
 
-        {/* Lista de comentarios */}
-        {loading ? (
-          renderSkeleton()
-        ) : comments.length > 0 ? (
-          <FlatList
-            data={comments}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderComment}
-            scrollEnabled={false}
-            ListEmptyComponent={
-              <View style={{ 
-                backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-                borderRadius: 12,
-                padding: 32,
-                alignItems: 'center',
-              }}>
-                <Ionicons 
-                  name="chatbubble-outline" 
-                  size={48} 
-                  color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} 
-                  style={{ marginBottom: 16 }}
-                />
-                <Text style={[styles.cardTitle, { marginBottom: 8, textAlign: 'center' }]}>
-                  {t('noComments')}
-                </Text>
-                <Text style={[styles.textSecondary, { textAlign: 'center' }]}>
-                  {t('noCommentsSubtitle')}
-                </Text>
-              </View>
+      {/* Lista de comentarios */}
+      {loading ? (
+        <View style={{ flex: 1, paddingTop: 16 }}>
+          {renderSkeleton()}
+        </View>
+      ) : comments.length > 0 ? (
+        <FlatList
+          ref={flatListRef}
+          data={reversedComments}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderComment}
+          inverted
+          contentContainerStyle={{ 
+            paddingTop: 16,
+            paddingBottom: 16,
+          }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => {
+            if (flatListRef.current && reversedComments.length > 0) {
+              flatListRef.current.scrollToIndex({ index: 0, animated: false });
             }
-          />
-        ) : (
-          <View style={{ 
+          }}
+          onLayout={() => {
+            if (flatListRef.current && reversedComments.length > 0) {
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: 0, animated: false });
+              }, 100);
+            }
+          }}
+        />
+      ) : (
+        <View style={{ 
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 32,
+        }}>
+          <View style={{
+            width: 80,
+            height: 80,
+            borderRadius: 40,
             backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-            borderRadius: 12,
-            padding: 32,
+            justifyContent: 'center',
             alignItems: 'center',
+            marginBottom: 20,
           }}>
             <Ionicons 
               name="chatbubble-outline" 
-              size={48} 
-              color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} 
-              style={{ marginBottom: 16 }}
+              size={40} 
+              color={isDarkMode ? colors.dark.textTertiary : colors.light.textTertiary}
             />
-            <Text style={[styles.cardTitle, { marginBottom: 8, textAlign: 'center' }]}>
-              {t('noComments')}
-            </Text>
-            <Text style={[styles.textSecondary, { textAlign: 'center' }]}>
-              {t('noCommentsSubtitle')}
-            </Text>
           </View>
-        )}
-      </ScrollView>
+          <Text style={{
+            fontSize: 18,
+            fontWeight: '600',
+            color: isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary,
+            marginBottom: 8,
+            textAlign: 'center',
+          }}>
+            {t('noComments')}
+          </Text>
+          <Text style={{
+            fontSize: 14,
+            color: isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary,
+            textAlign: 'center',
+            lineHeight: 20,
+          }}>
+            {t('noCommentsSubtitle')}
+          </Text>
+        </View>
+      )}
 
       {/* Input para nuevo comentario */}
       <View style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
         backgroundColor: isDarkMode ? colors.dark.surface : colors.light.surface,
         borderTopWidth: 1,
         borderTopColor: isDarkMode ? colors.dark.border : colors.light.border,
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        flexDirection: 'row',
-        alignItems: 'flex-end',
+        paddingTop: 12,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 8,
       }}>
         <View style={{
-          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'flex-end',
           backgroundColor: isDarkMode ? colors.dark.surfaceSecondary : colors.light.surfaceSecondary,
-          borderRadius: 20,
-          paddingHorizontal: 16,
-          paddingVertical: 8,
-          marginRight: 8,
+          borderRadius: 24,
+          paddingHorizontal: 4,
+          paddingVertical: 4,
+          marginBottom: 8,
         }}>
-          <TextInput
-            style={{
-              color: isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary,
-              fontSize: 16,
-            }}
-            placeholder={t('commentPlaceholder')}
-            placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
-            value={newComment}
-            onChangeText={setNewComment}
-            multiline
-            maxLength={500}
-          />
-        </View>
-        <TouchableOpacity 
-          onPress={handlePostComment}
-          disabled={!newComment.trim() || posting}
-          style={{
-            backgroundColor: newComment.trim() ? colors.primary[500] : colors.primary[300],
-            borderRadius: 20,
+          <View style={{
+            flex: 1,
             paddingHorizontal: 16,
-            paddingVertical: 8,
-            minWidth: 60,
-            alignItems: 'center',
-          }}
-        >
-          {posting ? (
-            <Text style={{ color: 'white', fontWeight: '600' }}>
-              {t('postingComment')}
-            </Text>
-          ) : (
-            <Text style={{ color: 'white', fontWeight: '600' }}>
-              {t('postComment')}
-            </Text>
-          )}
-        </TouchableOpacity>
+            paddingVertical: 10,
+            maxHeight: 100,
+          }}>
+            <TextInput
+              ref={inputRef}
+              style={{
+                color: isDarkMode ? colors.dark.textPrimary : colors.light.textPrimary,
+                fontSize: 15,
+                lineHeight: 20,
+                padding: 0,
+              }}
+              placeholder={t('commentPlaceholder')}
+              placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
+              value={newComment}
+              onChangeText={setNewComment}
+              multiline
+              maxLength={500}
+              returnKeyType="default"
+              blurOnSubmit={false}
+            />
+          </View>
+          <TouchableOpacity 
+            onPress={handlePostComment}
+            disabled={!newComment.trim() || posting}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: newComment.trim() ? colors.primary[500] : (isDarkMode ? colors.dark.surfaceTertiary : colors.light.surfaceTertiary),
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginLeft: 8,
+              shadowColor: newComment.trim() ? colors.primary[500] : 'transparent',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: newComment.trim() ? 4 : 0,
+            }}
+          >
+            {posting ? (
+              <Ionicons name="hourglass-outline" size={20} color="white" />
+            ) : (
+              <Ionicons 
+                name="send" 
+                size={20} 
+                color={newComment.trim() ? 'white' : (isDarkMode ? colors.dark.textTertiary : colors.light.textTertiary)} 
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+        {newComment.length > 0 && (
+          <Text style={{
+            fontSize: 11,
+            color: isDarkMode ? colors.dark.textTertiary : colors.light.textTertiary,
+            textAlign: 'right',
+            paddingHorizontal: 4,
+          }}>
+            {newComment.length}/500
+          </Text>
+        )}
       </View>
     </KeyboardAvoidingView>
   );

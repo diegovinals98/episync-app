@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Platform,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -33,6 +35,25 @@ const SettingsScreen = ({ navigation }) => {
   const [email, setEmail] = useState(user?.email || 'diego@email.com');
   const [profileImage, setProfileImage] = useState(user?.avatar_url || null);
   const [notifications, setNotifications] = useState(true);
+  const scrollViewRef = useRef(null);
+  const nameInputRef = useRef(null);
+  const emailInputRef = useRef(null);
+
+  // Manejar el teclado para hacer scroll automático
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+    };
+  }, []);
 
   // Cambiar foto de perfil
   const pickImage = async () => {
@@ -139,13 +160,19 @@ const SettingsScreen = ({ navigation }) => {
   );
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       
       <ScrollView 
+        ref={scrollViewRef}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Foto de perfil */}
         <View style={{ alignItems: 'center', marginBottom: 32 }}>
@@ -197,16 +224,20 @@ const SettingsScreen = ({ navigation }) => {
           <View style={{ marginBottom: 16 }}>
             <Text style={styles.inputLabel}>{t('name')}</Text>
             <TextInput 
+              ref={nameInputRef}
               value={name} 
               onChangeText={setName} 
               style={styles.inputContainer}
               placeholder={t('name')} 
-              placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} 
+              placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
+              returnKeyType="next"
+              onSubmitEditing={() => emailInputRef.current?.focus()}
             />
           </View>
           <View>
             <Text style={styles.inputLabel}>{t('email')}</Text>
             <TextInput 
+              ref={emailInputRef}
               value={email} 
               onChangeText={setEmail} 
               style={styles.inputContainer}
@@ -214,7 +245,8 @@ const SettingsScreen = ({ navigation }) => {
               placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} 
               keyboardType="email-address" 
               autoCapitalize="none" 
-              autoCorrect={false} 
+              autoCorrect={false}
+              returnKeyType="done"
             />
           </View>
         </View>
@@ -369,7 +401,7 @@ const SettingsScreen = ({ navigation }) => {
           })}
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

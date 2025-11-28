@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
@@ -143,29 +143,80 @@ const MainStack = () => {
 };
 
 const AppContent = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, accessToken } = useAuth();
+  const navigationRef = useRef(null);
+  const listenersRef = useRef(null);
   
-  // Configurar manejadores de notificaciones al montar el componente
+  // Configurar manejadores de notificaciones cuando la navegación esté lista y el usuario esté autenticado
+  const setupNotificationHandlers = () => {
+    if (isAuthenticated && navigationRef.current && accessToken) {
+      console.log('🔧 Configurando manejadores de notificaciones...');
+      
+      // Limpiar listeners anteriores si existen
+      if (listenersRef.current) {
+        if (listenersRef.current.notificationListener) {
+          listenersRef.current.notificationListener.remove();
+        }
+        if (listenersRef.current.responseListener) {
+          listenersRef.current.responseListener.remove();
+        }
+      }
+      
+      // Función para obtener el token de acceso
+      const getAccessToken = async () => {
+        // Obtener el token más reciente desde AsyncStorage
+        try {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          const token = await AsyncStorage.getItem('accessToken');
+          return token || accessToken;
+        } catch (error) {
+          console.error('Error obteniendo token:', error);
+          return accessToken;
+        }
+      };
+      
+      listenersRef.current = notificationRegistrationService.setupNotificationHandlers(
+        navigationRef,
+        getAccessToken
+      );
+    }
+  };
+  
+  // Configurar cuando cambie el estado de autenticación o el token
   useEffect(() => {
-    console.log('🔧 Configurando manejadores de notificaciones...');
-    const { notificationListener, responseListener } = notificationRegistrationService.setupNotificationHandlers();
-    
-    // Cleanup al desmontar
-    return () => {
-      if (notificationListener) {
-        notificationListener.remove();
-      }
-      if (responseListener) {
-        responseListener.remove();
-      }
-    };
-  }, []);
+    if (isAuthenticated && accessToken) {
+      // Esperar un momento para que navigationRef esté listo
+      const timer = setTimeout(() => {
+        setupNotificationHandlers();
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        if (listenersRef.current) {
+          if (listenersRef.current.notificationListener) {
+            listenersRef.current.notificationListener.remove();
+          }
+          if (listenersRef.current.responseListener) {
+            listenersRef.current.responseListener.remove();
+          }
+        }
+      };
+    }
+  }, [isAuthenticated, accessToken]);
   
   if (isLoading) {
     return <Loader message="Comprobando sesión..." />;
   }
   return (
-    <NavigationContainer>
+    <NavigationContainer 
+      ref={navigationRef}
+      onReady={() => {
+        // Configurar handlers cuando la navegación esté lista
+        if (isAuthenticated && accessToken) {
+          setupNotificationHandlers();
+        }
+      }}
+    >
       {isAuthenticated ? <MainStack /> : <AuthStack />}
     </NavigationContainer>
   );

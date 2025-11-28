@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -34,6 +35,31 @@ const RegisterScreen = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const scrollViewRef = useRef(null);
+  const inputRefs = {
+    username: useRef(null),
+    name: useRef(null),
+    lastname: useRef(null),
+    email: useRef(null),
+    password: useRef(null),
+    confirmPassword: useRef(null),
+  };
+
+  // Manejar el teclado para hacer scroll automático
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+    };
+  }, []);
 
   // Validación de formulario
   const validateForm = () => {
@@ -88,13 +114,19 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       
       <ScrollView 
+        ref={scrollViewRef}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Logo y título */}
         <View style={{ alignItems: 'center', marginVertical: 30 }}>
@@ -125,6 +157,7 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="at" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={inputRefs.username}
               value={username}
               onChangeText={setUsername}
               style={styles.input}
@@ -133,6 +166,8 @@ const RegisterScreen = ({ navigation }) => {
               autoCapitalize="none"
               autoCorrect={false}
               editable={!isRegistering}
+              returnKeyType="next"
+              onSubmitEditing={() => inputRefs.name.current?.focus()}
             />
           </View>
           
@@ -143,6 +178,7 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="person-outline" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={inputRefs.name}
               value={name}
               onChangeText={setName}
               style={styles.input}
@@ -150,6 +186,8 @@ const RegisterScreen = ({ navigation }) => {
               placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
               autoCapitalize="words"
               editable={!isRegistering}
+              returnKeyType="next"
+              onSubmitEditing={() => inputRefs.lastname.current?.focus()}
             />
           </View>
           
@@ -160,6 +198,7 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="person-outline" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={inputRefs.lastname}
               value={lastname}
               onChangeText={setLastname}
               style={styles.input}
@@ -167,6 +206,8 @@ const RegisterScreen = ({ navigation }) => {
               placeholderTextColor={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary}
               autoCapitalize="words"
               editable={!isRegistering}
+              returnKeyType="next"
+              onSubmitEditing={() => inputRefs.email.current?.focus()}
             />
           </View>
           
@@ -177,6 +218,7 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={inputRefs.email}
               value={email}
               onChangeText={setEmail}
               style={styles.input}
@@ -186,6 +228,8 @@ const RegisterScreen = ({ navigation }) => {
               autoCapitalize="none"
               autoCorrect={false}
               editable={!isRegistering}
+              returnKeyType="next"
+              onSubmitEditing={() => inputRefs.password.current?.focus()}
             />
           </View>
           
@@ -196,6 +240,7 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={inputRefs.password}
               value={password}
               onChangeText={setPassword}
               style={styles.input}
@@ -205,6 +250,8 @@ const RegisterScreen = ({ navigation }) => {
               autoCapitalize="none"
               autoCorrect={false}
               editable={!isRegistering}
+              returnKeyType="next"
+              onSubmitEditing={() => inputRefs.confirmPassword.current?.focus()}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
               <Ionicons
@@ -222,6 +269,7 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={inputRefs.confirmPassword}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               style={styles.input}
@@ -231,6 +279,8 @@ const RegisterScreen = ({ navigation }) => {
               autoCapitalize="none"
               autoCorrect={false}
               editable={!isRegistering}
+              returnKeyType="done"
+              onSubmitEditing={handleRegister}
             />
           </View>
           

@@ -10,6 +10,7 @@ import { ENV } from '../config/env';
 import { useToast } from './ToastContext';
 import socketService from '../services/socket.service';
 import notificationRegistrationService from '../services/notificationRegistration.service';
+import biometricService from '../services/biometric.service';
 
 // Configurar WebBrowser para auth
 WebBrowser.maybeCompleteAuthSession();
@@ -55,6 +56,33 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     loadTokens();
   }, []);
+
+  // Login con biometría (Face ID / Touch ID)
+  const loginWithBiometric = async () => {
+    try {
+      // No cambiar isLoading durante el login para evitar re-renders
+      // El isLoading solo se usa para la carga inicial de la app
+      
+      // Autenticar con biometría
+      const biometricResult = await biometricService.authenticate(
+        'Autentícate para iniciar sesión'
+      );
+      
+      if (!biometricResult.success) {
+        error('Error de autenticación', biometricResult.error || 'No se pudo autenticar');
+        return { success: false, error: biometricResult.error };
+      }
+      
+      // Obtener credenciales guardadas
+      const { email: storedEmail, password: storedPassword } = biometricResult.credentials;
+      
+      // Hacer login con las credenciales guardadas
+      return await loginWithEmail(storedEmail, storedPassword);
+    } catch (error) {
+      console.error('Biometric login error:', error);
+      return { success: false, error: error.message || 'Error en el login biométrico' };
+    }
+  };
 
   // Manejar respuesta de Google OAuth
   useEffect(() => {
@@ -201,7 +229,8 @@ export const AuthProvider = ({ children }) => {
   // Login con email/password
   const loginWithEmail = async (email, password) => {
     try {
-      setIsLoading(true);
+      // No cambiar isLoading durante el login para evitar re-renders que vacíen los campos
+      // El isLoading solo se usa para la carga inicial de la app
       
       // Para desarrollo, simular login exitoso si el email contiene "test"
       if (email.includes('test')) {
@@ -278,6 +307,15 @@ export const AuthProvider = ({ children }) => {
       
       await saveTokens(accessToken, refreshToken, userData);
       
+      // Guardar credenciales de forma segura para biometría (opcional)
+      try {
+        await biometricService.saveCredentials(email, password);
+        console.log('✅ Credenciales guardadas para biometría');
+      } catch (biometricError) {
+        console.warn('⚠️ No se pudieron guardar credenciales para biometría:', biometricError);
+        // No fallar el login si no se pueden guardar las credenciales
+      }
+      
       // Conectar al socket después del login exitoso
       try {
         console.log('🔌 Conectando al socket (global) después del login...');
@@ -299,8 +337,6 @@ export const AuthProvider = ({ children }) => {
       }
       
       return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -654,6 +690,10 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
       await AsyncStorage.removeItem('user');
+      
+      // Eliminar credenciales biométricas guardadas
+      await biometricService.removeStoredCredentials();
+      
       setUser(null);
       setAccessToken(null);
       setRefreshToken(null);
@@ -772,6 +812,7 @@ export const AuthProvider = ({ children }) => {
     loginWithEmail,
     loginWithGoogle,
     loginWithApple,
+    loginWithBiometric,
     register,
     logout,
     getAuthHeaders,

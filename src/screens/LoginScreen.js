@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   StatusBar,
   Platform,
   KeyboardAvoidingView,
+  ScrollView,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -19,11 +21,12 @@ import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../components/Skeleton';
 import RegisterScreen from './RegisterScreen';
 import Loader from '../components/Loader';
+import biometricService from '../services/biometric.service';
 
 const LoginScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme } = useTheme();
   const { t } = useLanguage();
-  const { loginWithEmail, loginWithGoogle, isLoading } = useAuth();
+  const { loginWithEmail, loginWithGoogle, loginWithBiometric, isLoading } = useAuth();
   const { success, error } = useToast();
   const styles = createComponentStyles(isDarkMode);
   
@@ -31,6 +34,60 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState('');
+  const scrollViewRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+
+  // Verificar disponibilidad de biometría al cargar
+  useEffect(() => {
+    checkBiometricAvailability();
+  }, []);
+
+  // Manejar el enfoque de inputs para hacer scroll
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        // Hacer scroll cuando aparece el teclado
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        // Opcional: hacer scroll al inicio cuando se oculta el teclado
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
+
+  const handleInputFocus = () => {
+    // El scroll se maneja automáticamente con los listeners del teclado
+  };
+
+  const checkBiometricAvailability = async () => {
+    try {
+      const { supported, types } = await biometricService.checkBiometricSupport();
+      const hasCredentials = await biometricService.hasStoredCredentials();
+      const isEnabled = await biometricService.isBiometricEnabled();
+      
+      if (supported && hasCredentials && isEnabled) {
+        setBiometricAvailable(true);
+        setBiometricType(types[0] || 'Biometría');
+      }
+    } catch (err) {
+      console.error('Error checking biometric:', err);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -43,10 +100,15 @@ const LoginScreen = ({ navigation }) => {
       const result = await loginWithEmail(email.trim(), password);
       if (result.success) {
         success('¡Bienvenido!', 'Sesión iniciada correctamente');
+      } else {
+        // En caso de error, limpiar solo la contraseña, mantener el correo
+        setPassword('');
       }
       // Los errores ya se manejan en el AuthContext con toasts específicos
     } catch (error) {
       error('Error', 'Error inesperado. Inténtalo de nuevo.');
+      // En caso de error, limpiar solo la contraseña, mantener el correo
+      setPassword('');
     } finally {
       setIsLoggingIn(false);
     }
@@ -72,7 +134,25 @@ const LoginScreen = ({ navigation }) => {
     navigation.navigate('Register');
   };
 
-  if (isLoading) {
+  const handleBiometricLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      const result = await loginWithBiometric();
+      if (result.success) {
+        success('¡Bienvenido!', 'Sesión iniciada con biometría');
+      }
+      // Los errores ya se manejan en el AuthContext
+    } catch (err) {
+      error('Error', 'Error con la autenticación biométrica');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  // Solo mostrar skeleton en la carga inicial, no durante el login
+  // El isLoading del AuthContext se usa para verificar tokens al iniciar la app
+  // No queremos que muestre skeleton cuando el usuario está haciendo login
+  if (isLoading && !isLoggingIn) {
     return (
       <View style={styles.container}>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
@@ -105,11 +185,20 @@ const LoginScreen = ({ navigation }) => {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       {/* Contenido principal */}
-      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 20 }}>
+      <ScrollView
+        ref={scrollViewRef}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 20 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {/* Logo y título */}
         <View style={{ alignItems: 'center', marginBottom: 60 }}>
           <View style={{
@@ -138,6 +227,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={emailInputRef}
               value={email}
               onChangeText={setEmail}
               style={styles.input}
@@ -147,6 +237,9 @@ const LoginScreen = ({ navigation }) => {
               autoCapitalize="none"
               autoCorrect={false}
               editable={!isLoggingIn}
+              onFocus={() => handleInputFocus(emailInputRef)}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
             />
           </View>
           
@@ -156,6 +249,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={passwordInputRef}
               value={password}
               onChangeText={setPassword}
               style={styles.input}
@@ -164,6 +258,9 @@ const LoginScreen = ({ navigation }) => {
               autoCapitalize="none"
               autoCorrect={false}
               editable={!isLoggingIn}
+              onFocus={() => handleInputFocus(passwordInputRef)}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
               <Ionicons
@@ -190,6 +287,38 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.buttonText}>{t('loginButton')}</Text>
             )}
           </TouchableOpacity>
+
+          {/* Botón de Face ID / Touch ID */}
+          {/*{biometricAvailable && (
+            <TouchableOpacity 
+              onPress={handleBiometricLogin} 
+              style={[
+                styles.button, 
+                { 
+                  backgroundColor: 'transparent',
+                  borderWidth: 1,
+                  borderColor: colors.primary[500],
+                  marginTop: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: isLoggingIn ? 0.7 : 1
+                }
+              ]} 
+              disabled={isLoggingIn}
+            >
+              <Ionicons 
+                name={biometricType === 'Face ID' ? 'face-recognition' : 'finger-print'} 
+                size={20} 
+                color={colors.primary[500]} 
+                style={{ marginRight: 8 }} 
+              />
+              <Text style={[styles.buttonText, { color: colors.primary[500] }]}>
+                {t('loginWithBiometric', { type: biometricType })}
+              </Text>
+            </TouchableOpacity>
+          )}*/}
+          
           
           {/* Separador */}
           <View style={styles.separator}>
@@ -210,14 +339,14 @@ const LoginScreen = ({ navigation }) => {
         </View>
 
         {/* Registro */}
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 32 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 32, marginBottom: 20 }}>
           <Text style={styles.textSecondary}>{t('noAccount')} </Text>
           <TouchableOpacity onPress={handleRegister}>
             <Text style={styles.textLink}>{t('registerHere')}</Text>
           </TouchableOpacity>
         </View>
         
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };

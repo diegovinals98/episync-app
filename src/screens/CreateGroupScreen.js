@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   Switch,
   Alert,
   Image,
+  Platform,
+  KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -41,6 +44,25 @@ const CreateGroupScreen = ({ navigation }) => {
   const [groupImage, setGroupImage] = useState(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const scrollViewRef = useRef(null);
+  const groupNameInputRef = useRef(null);
+  const groupDescriptionInputRef = useRef(null);
+
+  // Manejar el teclado para hacer scroll automático
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+    };
+  }, []);
   
   // Datos simulados para usuarios
   const mockUsers = [
@@ -331,10 +353,15 @@ const CreateGroupScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       
       <ScrollView 
+        ref={scrollViewRef}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
@@ -409,6 +436,7 @@ const CreateGroupScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="people-outline" size={18} color={isDarkMode ? colors.dark.textSecondary : colors.light.textSecondary} />
             <TextInput
+              ref={groupNameInputRef}
               value={groupName}
               onChangeText={setGroupName}
               style={styles.input}
@@ -417,6 +445,8 @@ const CreateGroupScreen = ({ navigation }) => {
               autoCapitalize="words"
               editable={!isCreating}
               maxLength={50}
+              returnKeyType="next"
+              onSubmitEditing={() => groupDescriptionInputRef.current?.focus()}
             />
           </View>
           
@@ -432,6 +462,7 @@ const CreateGroupScreen = ({ navigation }) => {
               style={{ marginTop: 4 }}
             />
             <TextInput
+              ref={groupDescriptionInputRef}
               value={groupDescription}
               onChangeText={setGroupDescription}
               style={[styles.input, { textAlignVertical: 'top', height: 80 }]}
@@ -441,6 +472,7 @@ const CreateGroupScreen = ({ navigation }) => {
               numberOfLines={4}
               editable={!isCreating}
               maxLength={200}
+              returnKeyType="done"
             />
           </View>
           
@@ -648,7 +680,7 @@ const CreateGroupScreen = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
